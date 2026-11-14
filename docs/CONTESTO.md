@@ -26,16 +26,18 @@ estratti dal disco originale per uso personale e dati di missione ricostruiti da
 - In RAM a missione in corso: tabella tipi unità, pool di 63 oggetti da 372 B, struttura del giocatore (SCOPERTE #20, #21).
 - Strumenti: Godot 4.7.2, Unity Hub 4.0.0 + Editor 6000.6.9f1, Ghidra 12.2 (headless) + JDK 25, binutils MIPS.
 
+**Aggiornamento di fine sessione (SCOPERTE #28–#32):**
+- Script di missione decodificati: T1 unità (40), T2 posizioni, T4/T5/T6 profili e tipi, T7 manovre, T8 comportamento, T9 azioni, soglie T10.
+- **Terreno** ridisegnato dai poligoni e dalle texture originali delle tessere (parte 0): `ac2_terrain.py mesh`.
+- **Interprete MIPS** (`pipeline/mipsvm/`): il codice originale della missione gira fuori dall'emulatore con 0 byte di differenza sulle unità.
+- **Godot**: demo di volo (logica mia, semplificata), vista dal vivo (logica originale via emulatore), terreno e unità in versione moderna (texture 4×, luce, ombre).
+  Camera di inseguimento con distanza e campo visivo che crescono con la velocità. Tutti i comandi: `docs/GODOT.md` §11.
+
 **Prossimi passi, in ordine:**
-1. **Decodificare i campi delle tabelle della parte 2** (già estratta: `parte2_tabelle.json`, SCOPERTE #24–#25; T2 = piazzamento verificato)
-   e poi le parti 0, 3, 4 (terreno) e dalle tabelle comuni
-   5/7, aiutandosi con la RAM a missione in corso: pool a `[0x800b8748]` (63 slot × 0x174, coordinate a 32 bit con 11 bit
-   frazionari alle parole 9–11 dello slot), tipo → modello con la tabella tipi (`[0x800b84fc]`). Confrontare con Gambit
-   (entry 79) per separare dati comuni e specifici. Risultato atteso: `mission/mission.json`.
-2. **Godot** (avviato; modernizzazione dell'XFA-27 con geometria morbida + texture 4× approvata dall'utente): ✅ visualizzatore dell'XFA-27 in `engines/godot` (PS1 fedele / moderna, GUIDA §2c). Prossimo: aggiungere
-   un'unità nemica al visualizzatore (gate Fase 2), poi scena di volo (camera, modello di volo arcade, HUD) e terreno.
-3. Audio dal disco reale (XA→WAV) e musica/voci della missione.
-4. Valutare aereo preferito (`+0x34`) e avanzamento (`+0x8b4`) per il gioco "completo"; poi il confronto con Unity.
+1. Sistemare le giunzioni del terreno (linee bianche) e verificare l'allineamento di z e delle unità sul terreno.
+2. **Comportamento originale dentro Godot**: collegare joypad e tempo all'interprete MIPS, integrarlo come estensione di Godot, disegnare con Godot, caricare i dati dal DAT senza snapshot.
+3. HUD originale, effetti (esplosioni, scie), cielo, audio; oggetti statici fuori dalle tessere; altre missioni.
+4. Semantica delle manovre T7 e dei nodi T8; ruolo di T3; confronto con altre missioni (stadio 0 Gambit).
 
 **Idea in sospeso (non decisa):** pannello "AC2" nel debug workspace dell'emulatore (ImGui, su un branch dedicato, merge a
 cura dell'utente) per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug workspace ha già una *Lua

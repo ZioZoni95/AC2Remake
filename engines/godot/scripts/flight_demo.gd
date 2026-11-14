@@ -290,7 +290,9 @@ func _update_fx(dt: float) -> void:
 			(f["n"] as Node3D).queue_free(); _fx.remove_at(i)
 
 func _update_cam(dt: float) -> void:
-	var want := _player.position + _player.basis * Vector3(0, 2.0, 6.5)   # camera di inseguimento vicina
+	var k := clampf(_speed / 210.0, 0.0, 1.0)                        # distanza e campo visivo crescono con la velocita'
+	_cam.fov = lerpf(62.0, 74.0, k)
+	var want := _player.position + _player.basis * Vector3(0, lerpf(1.6, 2.4, k), lerpf(4.5, 8.0, k))
 	_cam.position = _cam.position.lerp(want, clampf(dt * 6.0, 0, 1))
 	_cam.look_at(_player.position + _player.basis * Vector3(0, 0.8, -10.0), _player.basis.y)
 

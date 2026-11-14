@@ -62,7 +62,9 @@ func _process(dt: float) -> void:
 			node.position = q[0]
 			node.basis = (q[1] as Basis).scaled(Vector3.ONE * MODEL_SCALE)
 	var fwd := (pl[1] as Basis).z
-	var want := newp - fwd * 6.5 + Vector3.UP * 2.0
+	var k := clampf(_vel / 210.0, 0.0, 1.0)                           # distanza e campo visivo crescono con la velocita'
+	_cam.fov = lerpf(62.0, 74.0, k)
+	var want := newp - fwd * lerpf(4.5, 8.0, k) + Vector3.UP * lerpf(1.6, 2.4, k)
 	_cam.position = _cam.position.lerp(want, clampf(dt * 8.0, 0, 1))
 	_cam.look_at(newp + fwd * 10.0, Vector3.UP)
 	_hud.text = "ORIGINALE dal vivo  frame %d   VEL %d km/h   QUOTA %d m   pos (%d, %d, %d)\nIl gioco gira nell'emulatore: pilota li (WASD/Z/C/X). Esc esce." % [
