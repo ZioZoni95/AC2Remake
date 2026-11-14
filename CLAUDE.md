@@ -9,7 +9,8 @@ marchi sono di Namco/Sony.
 1. `docs/CONTESTO.md` — stato attuale, prossimi passi, come ricostruire l'ambiente
 2. `docs/GUIDA.md` — comandi verificati (emulatore, estrazione, disassemblaggio)
 3. `docs/SCOPERTE.md` — tutto ciò che è stato scoperto sul disco (con prove)
-4. `docs/DECISIONI.md`, `docs/ROADMAP.md`, `docs/METODOLOGIA_RE.md`, `docs/PIPELINE.md`
+4. `docs/GODOT.md` (uso di Godot e comandi), `docs/STRUMENTI.md` (software da installare) e `docs/MULTI_PC.md` (lavoro su più macchine)
+5. `docs/DECISIONI.md`, `docs/ROADMAP.md`, `docs/METODOLOGIA_RE.md`, `docs/PIPELINE.md`
 
 ## Regole (le ha date l'utente, valgono sempre)
 

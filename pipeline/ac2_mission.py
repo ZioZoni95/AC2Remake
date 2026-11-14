@@ -14,6 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ace2arc, acemodel, ac2_extract as X, pngout, tim2png  # noqa: E402
 
 MISSING = (13, 17, 19)
+# Parte 2 = definizione della missione (SCOPERTE #24): intestazione di 13 parole [flag, off1..off12], ogni offset punta a una
+# tabella [contatore u32][record]; dimensioni di record ricavate dai dati (tutte intere) e confermate dal codice (FUN_80046394).
+P2_RECORD = {1: 20, 2: 20, 3: 8, 4: 28, 5: 36, 6: 52, 7: 28, 8: 24, 9: 12}
 
 
 def entry_for(stage, variant=1):
@@ -25,6 +28,47 @@ def split(b, hdr):
     n = struct.unpack_from("<I", b, hdr)[0]
     offs = list(struct.unpack_from("<%dI" % n, b, hdr + 4)) + [len(b)]
     return [b[offs[j]:offs[j + 1]] for j in range(n)]
+
+
+def decode_part2(p):
+    """Tabelle della parte 2 -> dict. Campi NON ancora interpretati restano come parole grezze (s32 e hex)."""
+    w = struct.unpack_from("<13I", p, 0)
+    offs = list(w[1:13])
+    out = {"flag": hex(w[0]), "tabelle": {}}
+    for t in range(1, 10):
+        o = offs[t - 1]; n = struct.unpack_from("<I", p, o)[0]; rs = P2_RECORD[t]
+        recs = []
+        for r in range(n):
+            ws = struct.unpack_from("<%di" % (rs // 4), p, o + 4 + r * rs)
+            recs.append({"i": r, "s32": list(ws), "hex": [f"{x & 0xffffffff:08x}" for x in ws]})
+        out["tabelle"][f"T{t}"] = {"offset": o, "record": n, "byte_per_record": rs, "record_dati": recs}
+    out["tabelle"]["T10"] = {"offset": offs[9], "ascii": p[offs[9]:offs[9] + 76].split(b"\0")[0].decode("latin-1")}
+    # T2 (verificata contro le unita' vive): parole 2,3,4 = x, y, z in unita' di mondo (le unita' vive li hanno x2048)
+    for r in out["tabelle"]["T2"]["record_dati"]:
+        r["pos"] = r["s32"][2:5]
+    out["unita"] = decode_units(p, offs)
+    return out
+
+
+def decode_units(p, offs):
+    """T1 = lista iniziale delle unita' (indice = slot del pool). Campi ricavati da FUN_80046dfc (SCOPERTE #27):
+    short+0 = capo formazione; byte+8 = categoria (0 giocatore, 1/4/7 aerea->T4, 2/3/5/6/8/9 terrestre->T5);
+    byte+9 = indice posizione in T2 (x,y,z a +8/+0xc/+0x10, angoli short a +2/+4/+6; y=0 => appoggiata al suolo);
+    byte+0xb = tipo di modello (0xff = nessuno); byte+0xc = parametro (w2 dello slot); byte+0xd = squadra; byte+0xf = sottotipo."""
+    def rec(t, rs, i):
+        o = offs[t - 1]
+        return p[o + 4 + i * rs:o + 4 + (i + 1) * rs]
+    n1 = struct.unpack_from("<I", p, offs[0])[0]
+    res = []
+    for i in range(n1):
+        r = rec(1, 20, i)
+        t2 = rec(2, 20, r[9])
+        x, y, z = struct.unpack_from("<3i", t2, 8)
+        res.append({"slot": i, "capo": struct.unpack_from("<h", r, 0)[0], "categoria": r[8], "t2": r[9],
+                    "pos": [x, y, z], "angoli": list(struct.unpack_from("<3h", t2, 2)), "a_terra": y == 0,
+                    "tipo": (0 if r[11] == 0xff else r[11]), "tipo_grezzo": r[11], "param": r[12], "squadra": r[13],
+                    "sottotipo": r[15], "hex": r.hex()})
+    return res
 
 
 def extract(stage, outdir, variant=1, dat="out/iso/ACE2.DAT"):
@@ -68,6 +112,24 @@ def extract(stage, outdir, variant=1, dat="out/iso/ACE2.DAT"):
             acemodel.to_gltf_vram(m, vram, base)
             man["modelli"].append({"elemento": j, "tipo": j // 3, "lod": j % 3, "vertici": len(m["verts"]),
                                    "gt3": len(m["tris"]), "gt4": len(m["quads"])})
+    if len(parts) > 2:
+        p2 = decode_part2(parts[2])
+        json.dump(p2, open(os.path.join(outdir, "parte2_tabelle.json"), "w"), indent=1)
+        man["parte2"] = {t: v.get("record") for t, v in p2["tabelle"].items()}
+        # mappa dall'alto della T2: x orizzontale, z verticale, colore per quota (y: piu' negativo = piu' in alto)
+        pts = [r["pos"] for r in p2["tabelle"]["T2"]["record_dati"]]
+        xs = [q[0] for q in pts]; zs = [q[2] for q in pts]
+        if pts:
+            W = H = 600; m = 30
+            sc = min((W - 2 * m) / max(max(xs) - min(xs), 1), (H - 2 * m) / max(max(zs) - min(zs), 1))
+            img = [bytearray(b"\x18\x1c\x28" * W) for _ in range(H)]
+            for x, y, z in pts:
+                px = int(m + (x - min(xs)) * sc); py = int(m + (z - min(zs)) * sc)
+                c = (240, 200, 60) if y > -2500 else (90, 170, 240)       # a terra / in quota
+                for dy in range(-3, 4):
+                    for dx in range(-3, 4):
+                        if 0 <= px + dx < W and 0 <= py + dy < H: img[py + dy][(px + dx) * 3:(px + dx) * 3 + 3] = bytes(c)
+            pngout.write_png(os.path.join(outdir, "mappa_t2.png"), W, H, [bytes(r) for r in img])
     json.dump(man, open(os.path.join(outdir, "manifest.json"), "w"), indent=1)
     print(f"stadio {stage} variante {variant}: entry {e} ({len(b)} B), {len(parts)} parti, "
           f"{len(man['texture'])} TIM, {len(man['modelli'])} modelli -> {outdir}")

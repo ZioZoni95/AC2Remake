@@ -2,7 +2,8 @@
 """ac2_aircraft — esporta gli aerei giocabili di Ace Combat 2 (uso personale, output NON versionato).
 
   ac2_aircraft.py list                          elenca i 24 aerei (id, nome, entry DAT)
-  ac2_aircraft.py export NOME|ID OUTDIR         glTF texturizzato + OBJ (es. XFA-27, 23)
+  ac2_aircraft.py export NOME|ID OUTDIR [--smooth] [--subdiv N]   glTF texturizzato + OBJ (es. XFA-27, 23);
+                                                (--smooth: normali morbide; --subdiv N: N livelli di suddivisione, file *_smoothN)
   ac2_aircraft.py all OUTDIR                    tutti e 24
 
 Fatti (SCOPERTE #21, #22): i nomi sono nella tabella a 0x800af758 dell'overlay (id 0..23 = i giocabili);
@@ -60,7 +61,7 @@ def find_model(b):
     return None, b""
 
 
-def export(ident, outdir, dat="out/iso/ACE2.DAT"):
+def export(ident, outdir, dat="out/iso/ACE2.DAT", smooth=False, subdiv=0, suffix=""):
     nm = names()
     idx = int(ident) if str(ident).isdigit() else [x.lower() for x in nm].index(str(ident).lower())
     b = load_entry(dat, 30 + idx)
@@ -68,10 +69,10 @@ def export(ident, outdir, dat="out/iso/ACE2.DAT"):
     if m is None:
         raise SystemExit(f"{nm[idx]}: modello non trovato")
     os.makedirs(outdir, exist_ok=True)
-    base = os.path.join(outdir, re.sub(r"[^A-Za-z0-9]+", "", nm[idx]).lower())
+    base = os.path.join(outdir, re.sub(r"[^A-Za-z0-9]+", "", nm[idx]).lower() + suffix)
     acemodel.to_obj(m, base + ".obj")
     try:
-        acemodel.to_gltf(m, tim, base)
+        acemodel.to_gltf(m, tim, base, smooth=smooth, subdiv=subdiv)
         tex = "con texture"
     except Exception as e:                      # TIM assente o CLUT su altra riga: solo geometria
         tex = f"SENZA texture ({e})"
@@ -83,8 +84,10 @@ if __name__ == "__main__":
     if a[:1] == ["list"]:
         for i, n in enumerate(names()):
             print(f"{i:2} {n:8} entry {30 + i}")
-    elif a[:1] == ["export"] and len(a) == 3:
-        export(a[1], a[2])
+    elif a[:1] == ["export"] and len(a) >= 3:
+        sd = int(a[a.index("--subdiv") + 1]) if "--subdiv" in a else 0
+        sm = "--smooth" in a or sd > 0
+        export(a[1], a[2], smooth=sm, subdiv=sd, suffix=(f"_smooth{sd}" if sm else ""))
     elif a[:1] == ["all"] and len(a) == 2:
         for i in range(N):
             export(i, a[1])

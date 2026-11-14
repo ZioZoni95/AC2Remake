@@ -28,3 +28,8 @@ engines/unity/UserSettings/
 engines/unity/[Oo]bj/
 engines/unity/[Bb]uild/
 out/
+
+# Godot: asset copiati dal disco (proprietari) e cache dell'editor
+engines/godot/assets/
+engines/godot/.godot/
+*.import

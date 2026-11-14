@@ -125,7 +125,69 @@ def palette_image(tim, pal):
     return w, h, px
 
 
-def to_gltf(m, tim_bytes, outbase, scale=0.01):
+# ---------------------------------------------------------------- geometria piu' morbida (normali + suddivisione)
+def _sub(a, b): return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+def _dot(a, b): return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+def _cross(a, b): return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+def _norm(a):
+    l = _dot(a, a) ** 0.5
+    return (a[0] / l, a[1] / l, a[2] / l) if l > 1e-12 else (0.0, 1.0, 0.0)
+def _key(p): return (round(p[0], 5), round(p[1], 5), round(p[2], 5))
+
+
+def _smooth_normals(groups):
+    """Normali per vertice mediate per area su tutte le facce che condividono la posizione.
+    Il segno e' scelto in modo che puntino verso l'esterno rispetto al baricentro del modello."""
+    acc, cen, n, test = {}, [0.0, 0.0, 0.0], 0, 0.0
+    tris = []
+    for g in groups.values():
+        P = g["pos"]
+        for i in range(0, len(P), 3):
+            tris.append((P[i], P[i + 1], P[i + 2]))
+            for q in tris[-1]:
+                cen = [cen[0] + q[0], cen[1] + q[1], cen[2] + q[2]]; n += 1
+    cen = tuple(c / max(n, 1) for c in cen)
+    for a, b, c in tris:
+        nr = _cross(_sub(b, a), _sub(c, a))                      # lunghezza = 2 x area
+        fc = ((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3)
+        test += _dot(nr, _sub(fc, cen))
+        for q in (a, b, c):
+            t = acc.setdefault(_key(q), [0.0, 0.0, 0.0])
+            t[0] += nr[0]; t[1] += nr[1]; t[2] += nr[2]
+    # NON si inverte per puntare "verso l'esterno": con materiale a doppia faccia Godot inverte la normale sulle facce
+    # viste da dietro in base al VERSO DEI TRIANGOLI, quindi la normale attributo deve seguire il winding (provato a vista:
+    # invertirla per il baricentro colora tutto di azzurro e cancella la livrea).
+    sign = 1.0
+    return {k: _norm((sign * v[0], sign * v[1], sign * v[2])) for k, v in acc.items()}
+
+
+def _refine(g, nmap, levels=0, alpha=0.5):
+    """Restituisce (pos, uv, col, normali) di un gruppo, con `levels` suddivisioni (x4 triangoli ciascuna):
+    punti medi spostati con la tessellazione di Phong (proiezione sui piani tangenti dei vertici)."""
+    P, U, C = g["pos"], g["uv"], g["col"]
+    T = []
+    for i in range(0, len(P), 3):
+        T.append([(P[i + k], U[i + k], C[i + k], nmap[_key(P[i + k])]) for k in range(3)])
+    def mid(a, b):
+        m = tuple((a[0][i] + b[0][i]) / 2 for i in range(3))
+        pa = tuple(m[i] - _dot(_sub(m, a[0]), a[3]) * a[3][i] for i in range(3))
+        pb = tuple(m[i] - _dot(_sub(m, b[0]), b[3]) * b[3][i] for i in range(3))
+        pos = tuple((1 - alpha) * m[i] + alpha * (pa[i] + pb[i]) / 2 for i in range(3))
+        uv = tuple((a[1][i] + b[1][i]) / 2 for i in range(2))
+        col = tuple((a[2][i] + b[2][i]) / 2 for i in range(4))
+        return (pos, uv, col, _norm(tuple(a[3][i] + b[3][i] for i in range(3))))
+    for _ in range(levels):
+        nt = []
+        for a, b, c in T:
+            ab, bc, ca = mid(a, b), mid(b, c), mid(c, a)
+            nt += [[a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]]
+        T = nt
+    pos = [v[0] for t in T for v in t]; uv = [v[1] for t in T for v in t]
+    col = [v[2] for t in T for v in t]; nor = [v[3] for t in T for v in t]
+    return pos, uv, col, nor
+
+
+def to_gltf(m, tim_bytes, outbase, scale=0.01, smooth=False, subdiv=0):
     """Scrive outbase.gltf (+ outbase_pN.png, una per palette usata). Facce non indicizzate
     (UV e colore per faccia); y invertita (PSX y verso il basso) con winding corretto."""
     tim = parse_tim4(tim_bytes)
@@ -152,6 +214,7 @@ def to_gltf(m, tim_bytes, outbase, scale=0.01):
     # UV/clut/tpage: rileggiamo dal blob dato che _prims non li espone -> usiamo m["raw"]
     for i, col, uv, clut, tpage in m["faces"]:
         add((i, col, uv, clut, tpage))
+    nmap = _smooth_normals(groups) if (smooth or subdiv) else None
     buf = bytearray(); views = []; accs = []; prims = []; mats = []; texs = []; imgs = []
     def push(data, target, count, ctype, mn=None, mx=None, ctypeid=5126):
         while len(buf) % 4: buf.append(0)
@@ -167,12 +230,17 @@ def to_gltf(m, tim_bytes, outbase, scale=0.01):
         mats.append({"name": f"pal{pal}", "doubleSided": True, "alphaMode": "MASK", "alphaCutoff": 0.5,
                      "pbrMetallicRoughness": {"baseColorTexture": {"index": len(texs) - 1},
                                               "metallicFactor": 0.0, "roughnessFactor": 1.0}})
-        P = g["pos"]
+        P, UV, CO, NO = g["pos"], g["uv"], g["col"], None
+        if nmap is not None:
+            P, UV, CO, NO = _refine(g, nmap, subdiv)
         pa = push(b"".join(struct.pack("<3f", *p) for p in P), 34962, len(P), "VEC3",
                   [min(p[i] for p in P) for i in range(3)], [max(p[i] for p in P) for i in range(3)])
-        ua = push(b"".join(struct.pack("<2f", *u) for u in g["uv"]), 34962, len(P), "VEC2")
-        ca = push(b"".join(struct.pack("<4f", *c) for c in g["col"]), 34962, len(P), "VEC4")
-        prims.append({"attributes": {"POSITION": pa, "TEXCOORD_0": ua, "COLOR_0": ca}, "material": n})
+        ua = push(b"".join(struct.pack("<2f", *u) for u in UV), 34962, len(P), "VEC2")
+        ca = push(b"".join(struct.pack("<4f", *c) for c in CO), 34962, len(P), "VEC4")
+        attrs = {"POSITION": pa, "TEXCOORD_0": ua, "COLOR_0": ca}
+        if NO is not None:
+            attrs["NORMAL"] = push(b"".join(struct.pack("<3f", *q) for q in NO), 34962, len(P), "VEC3")
+        prims.append({"attributes": attrs, "material": n})
     gl = {"asset": {"version": "2.0", "generator": "AC2Remake acemodel"},
           "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0}],
           "meshes": [{"primitives": prims}], "materials": mats, "textures": texs, "images": imgs,
@@ -226,7 +294,7 @@ def vram_page_image(vram, tpage, clut):
     return bytes(out)
 
 
-def to_gltf_vram(m, vram, outbase, scale=0.01):
+def to_gltf_vram(m, vram, outbase, scale=0.01, smooth=False, subdiv=0):
     """Come to_gltf, ma le texture si campionano dalla VRAM: una immagine per coppia (tpage, clut) usata."""
     groups = {}
     for verts, cols, uvs, clut, tpage in m["faces"]:
@@ -238,6 +306,7 @@ def to_gltf_vram(m, vram, outbase, scale=0.01):
                 u, v = uvs[k]
                 g["uv"].append(((u + 0.5) / 256, (v + 0.5) / 256))
                 g["col"].append(tuple(min(255, c2 * 2) / 255 for c2 in cols[k]) + (1.0,))
+    nmap = _smooth_normals(groups) if (smooth or subdiv) else None
     buf = bytearray(); views = []; accs = []; prims = []; mats = []; texs = []; imgs = []
     def push(data, count, ctype, mn=None, mx=None):
         while len(buf) % 4: buf.append(0)
@@ -252,12 +321,17 @@ def to_gltf_vram(m, vram, outbase, scale=0.01):
         imgs.append({"uri": os.path.basename(png)}); texs.append({"source": len(imgs) - 1, "sampler": 0})
         mats.append({"name": f"tp{tp:02x}_cl{cl:04x}", "doubleSided": True, "alphaMode": "MASK", "alphaCutoff": 0.5,
                      "pbrMetallicRoughness": {"baseColorTexture": {"index": len(texs) - 1}, "metallicFactor": 0.0, "roughnessFactor": 1.0}})
-        P = g["pos"]
+        P, UV, CO, NO = g["pos"], g["uv"], g["col"], None
+        if nmap is not None:
+            P, UV, CO, NO = _refine(g, nmap, subdiv)
         pa = push(b"".join(struct.pack("<3f", *p) for p in P), len(P), "VEC3",
                   [min(p[i] for p in P) for i in range(3)], [max(p[i] for p in P) for i in range(3)])
-        ua = push(b"".join(struct.pack("<2f", *u) for u in g["uv"]), len(P), "VEC2")
-        ca = push(b"".join(struct.pack("<4f", *c) for c in g["col"]), len(P), "VEC4")
-        prims.append({"attributes": {"POSITION": pa, "TEXCOORD_0": ua, "COLOR_0": ca}, "material": n})
+        ua = push(b"".join(struct.pack("<2f", *u) for u in UV), len(P), "VEC2")
+        ca = push(b"".join(struct.pack("<4f", *c) for c in CO), len(P), "VEC4")
+        attrs = {"POSITION": pa, "TEXCOORD_0": ua, "COLOR_0": ca}
+        if NO is not None:
+            attrs["NORMAL"] = push(b"".join(struct.pack("<3f", *q) for q in NO), len(P), "VEC3")
+        prims.append({"attributes": attrs, "material": n})
     gl = {"asset": {"version": "2.0", "generator": "AC2Remake acemodel/vram"}, "scene": 0, "scenes": [{"nodes": [0]}],
           "nodes": [{"mesh": 0}], "meshes": [{"primitives": prims}], "materials": mats, "textures": texs, "images": imgs,
           "samplers": [{"magFilter": 9728, "minFilter": 9728, "wrapS": 33071, "wrapT": 33071}],

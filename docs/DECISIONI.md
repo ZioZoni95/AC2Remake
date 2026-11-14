@@ -69,3 +69,18 @@ dice nulla sul remake (errore fatto e corretto il 2026-11-14).
 (avanzamento rapido, `master` = `c59eb77`, già su `origin/master`). **Conseguenza**: D8 resta valida per il
 metodo (modifiche all'emulatore su un branch dedicato, merge a cura dell'utente) ma non serve più il checkout del
 branch per usare `emu.write_*`: basta `master`. Il branch remoto `feature/lua-memory-write` esiste ancora.
+
+## D13 — Modernizzazione degli asset dentro Godot, senza Unity
+**Data**: 2026-11-14. **Scelta**: il "moderno" si ottiene con materiali, luci e post-elaborazione in Godot (già visibile nel
+visualizzatore, tasto `M`) e con una pipeline di asset in tre livelli: (1) **texture ingrandite con Real-ESRGAN** (ncnn-vulkan,
+GPU), (2) **geometria più morbida** (normali morbide + suddivisione di Phong, `acemodel --smooth/--subdiv`), (3) **materiali PBR**
+(rugosità/metallo/normal map dedotte, da rifinire a mano). Primo banco di prova: **XFA-27**. **Perché**: l'utente vuole provare
+prima la resa moderna con texture rifatte; il salto di qualità dipende dagli asset, non dal motore, quindi Unity non serve
+(resta il confronto opzionale di D3). **Limiti noti**: le texture PS1 sono a 16 colori con linee nette (l'upscaling neurale può
+ammorbidirle: provare più modelli e confrontare a vista); la suddivisione arrotonda, non aggiunge dettagli. **Vincolo**: tutto
+ciò che deriva dal gioco resta fuori da git (`engines/godot/assets/` ignorata).
+
+## D14 — Modello di upscaling: Real-ESRGAN x4plus-anime
+**Data**: 2026-11-14. **Scelta**: per le texture PS1 degli aerei si usa `realesrgan-x4plus-anime` (4×, ncnn-vulkan). **Perché**: confronto a vista
+su XFA-27: tiene nette le linee dei pannelli e liscia i campi piatti; `x4plus` aggiunge grana da foto, `animevideov3` sfoca. Verificato in
+Godot (modalità moderna) con giudizio positivo dell'utente. **Limite**: provato su un solo aereo; i bordi possono avere aloni leggeri.

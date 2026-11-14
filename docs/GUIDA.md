@@ -100,6 +100,72 @@ cliccare sulle righe del ROOT MENU due volte di fila (colpisce righe diverse).
 
 ---
 
+## 2c. Godot: visualizzatore degli aerei (✅ verificato il 2026-11-14)
+
+Progetto in `engines/godot` (Godot 4.7.2, Forward+, MSAA). Gli asset NON sono nel repo: si estraggono dal disco (§3) e si
+copiano con `tools/sync_godot_assets.sh` in `engines/godot/assets/` (ignorata da git).
+
+```sh
+./tools/sync_godot_assets.sh                      # copia aerei e unità di Fighter's Honor nel progetto
+godot --path engines/godot                         # visualizzatore (default: XFA-27, modalità moderna)
+godot --path engines/godot -- --model=res://assets/aerei/f117a.gltf --mode=psx    # un altro aereo, modalità fedele
+```
+Il glTF si carica a runtime (`GLTFDocument`): nessun passaggio di importazione manuale. **Due modalità (tasto `M`)**:
+*PS1 fedele* (texture a pixel netti, colori vertice come luce, nessuna ombra) e *moderna* (stessa geometria e texture, con
+filtro e mipmap, normali morbide, luce con ombre, riflessi, cielo, SSAO, glow). Comandi: frecce = orbita, rotella/`+`/`-` = zoom,
+`Spazio` = pausa rotazione, `Esc` = esci. Limite noto: la geometria resta quella originale (~150 vertici per aereo), il
+"moderno" viene da materiali, luci e post-elaborazione, non da più poligoni.
+
+## 2d. Modernizzare un aereo (Livelli 1–3, D13; XFA-27 come banco di prova)
+
+```sh
+# Livello 2 (✅ fatto, solo Python): normali morbide e suddivisione di Phong (~x4 triangoli per livello)
+python3 -I pipeline/ac2_aircraft.py export XFA-27 out/aerei --smooth      # xfa27_smooth0.gltf (con NORMAL)
+python3 -I pipeline/ac2_aircraft.py export XFA-27 out/aerei --subdiv 1    # xfa27_smooth1.gltf (~4x triangoli)
+./tools/sync_godot_assets.sh
+godot --path engines/godot -- --model=res://assets/aerei/xfa27_smooth1.gltf --mode=modern
+
+# Livello 1 (✅ fatto sull'XFA-27): upscaling delle texture con Real-ESRGAN (GPU, ~1-6 s per texture 256x256 -> 1024x1024)
+bash tools/install_upscaler.sh                       # una volta: ~45 MB in ~/Tools/realesrgan (usare `bash`: lo script non era eseguibile)
+python3 -I tools/upscale_gltf.py out/aerei/xfa27_smooth1.gltf          # → xfa27_smooth1_hd.gltf + PNG *_hd.png accanto
+./tools/sync_godot_assets.sh
+godot --path engines/godot -- --model=res://assets/aerei/xfa27_smooth1_hd.gltf --mode=modern
+```
+**Confronto dei modelli** (XFA-27, texture p0, a vista): `realesrgan-x4plus-anime` è il migliore per queste texture (pannelli e
+linee nette, campi piatti lisci, rossi saturi); `realesrgan-x4plus` aggiunge grana da foto; `realesr-animevideov3` è più sfocato.
+Default di `upscale_gltf.py`: `realesrgan-x4plus-anime`, scala 4. Giudizio dell'utente sul risultato in Godot: **"bellissimo"**.
+Livello 3 (PBR: rugosità/metallo/normal map) non ancora iniziato. Strumenti e versioni: `docs/STRUMENTI.md`.
+
+---
+
+## 2e. Snapshot di una missione in corso (✅ FH, 2026-11-14)
+
+Con l'emulatore avviato con `ac2_remote.lua` e la missione in esecuzione (F8 dallo stato salvato), il comando (scritto in un file
+temporaneo e poi `mv /tmp/ac2_cmd.tmp /tmp/ac2_cmd.lua`) scarica RAM e VRAM, mentre l'emulazione è ferma per tutta la lettura:
+```lua
+local f = io.open("/tmp/ac2_ram.bin", "wb")
+local a = 0x80000000
+while a < 0x80200000 do
+  local t = {}
+  for i = 0, 4095 do t[#t + 1] = string.pack("<I4", rd32(a + i * 4)) end
+  f:write(table.concat(t)); a = a + 16384
+end
+f:close()
+local g = io.open("/tmp/ac2_vram2.bin", "wb")
+for y = 0, 511 do local row = {}
+  for x = 0, 1023 do row[#row + 1] = string.pack("<I2", emu.vram16(x, y)) end
+  g:write(table.concat(row)) end
+g:close()
+```
+```sh
+mkdir -p out/fh_ram && cp /tmp/ac2_ram.bin out/fh_ram/ram.bin && cp /tmp/ac2_vram2.bin out/fh_ram/vram.bin
+python3 -I pipeline/ac2_snapshot.py out/fh_ram out/fh_ram/analisi        # objects.json, mappa_unita.png, vram.png
+```
+Non serve mettere in pausa l'emulatore (se serve fermare il tempo per più letture, usare la pausa **del gioco**: con la pausa
+dell'emulatore i comandi non girano). I file dello snapshot non vanno in git.
+
+---
+
 ## 3. Estrarre gli asset dal disco
 
 Tutto in `out/` (non versionato). Bastano tre comandi, nell'ordine:
@@ -139,7 +205,7 @@ python3 -I pipeline/ac2_aircraft.py all out/aerei              # tutti e 24
 ```sh
 python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor    # ~4 s, 2,3 MB
 # → partNN.bin (11 parti grezze), tex/*.png (49 TIM), vram.png (VRAM ricostruita),
-#   models/unita_NN.gltf (13 unità texturizzate), manifest.json
+#   models/unita_NN.gltf (13 unità texturizzate), parte2_tabelle.json (9 tabelle decodificate), mappa_t2.png, manifest.json
 ```
 
 Audio (XA → WAV, `xa_audio.py`): testato solo su fixture sintetica, **non ancora sul disco reale**.
@@ -189,6 +255,13 @@ Script in `pipeline/ghidra/`: `SetGp.java`, `DecompileAt.java` (decompila la fun
 ne elenca i chiamanti), `RefsTo.java` (chi legge/scrive un indirizzo). L'analisi di ciascun binario richiede
 meno di un minuto.
 
+**Esportare tutto il codice** (✅ overlay: 1.217 funzioni in ~1 min, 0 fallite; poi il loader): è la base per cercare qualunque struttura.
+```sh
+~/Tools/ghidra/support/analyzeHeadless out/ghidra AC2 -process overlay0.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/overlay0
+~/Tools/ghidra/support/analyzeHeadless out/ghidra AC2 -process main_exe.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/loader
+# → out/codice/overlay0.c (C decompilato, con chiamanti/chiamati di ogni funzione), overlay0.idx.tsv; il codice della sola missione = funzioni
+#   raggiungibili da FUN_80027638 (init) e FUN_8002a1f4 (ciclo per fotogramma): 513 funzioni, vedi SCOPERTE #27
+```
 Dove guardare (già scoperto, vedi `docs/SCOPERTE.md`):
 - tabella titoli missioni: array di puntatori a `0x800ad8b4…0x800ad930` (Fighter's Honor è l'ultimo);
 - menu di debug `ROOT MENU`: gestito da `FUN_80066858` (`0x80066858`), voci a `0x800ad2e8`; **raggiunto e pilotato da Lua** (SCOPERTE #12–#14, vedi §2);

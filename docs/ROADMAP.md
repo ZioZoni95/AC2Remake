@@ -66,3 +66,10 @@ Piano a fasi con gate espliciti. Ogni fase si chiude solo con una consegna verif
   dal disco reale, import in Godot (gate: un aereo + un nemico con le texture giuste).
 - **Fase 3**: ✅ **Fighter's Honor avviata dal titolo senza completare il gioco** (SCOPERTE #12–#18), ricetta salvata in
   `pipeline/lua/ac2_start_fighters_honor.lua` e in GUIDA §2b. Restano: nemici/waypoint/trigger → `mission.json`.
+- **Fase 4 (avvio)**: ✅ progetto Godot in `engines/godot` con visualizzatore degli aerei in due modalità (PS1 fedele / moderna);
+  gate della Fase 2 **parzialmente** raggiunto: un aereo (XFA-27) renderizzato con le texture giuste; manca un'unità nemica nel
+  visualizzatore e la scena di volo (camera, modello di volo arcade, HUD).
+- **Modernizzazione (D13)**: ✅ Livello 2 (normali morbide + suddivisione, `acemodel`); ❌ Livello 1 (upscaling Real-ESRGAN: da installare
+  a mano con `tools/install_upscaler.sh`); Livello 3 (PBR) da fare. Banco di prova: XFA-27.
+- **Modernizzazione (D13) aggiornata**: ✅ Livello 1 (upscaling Real-ESRGAN `x4plus-anime`) e ✅ Livello 2 sull'XFA-27, approvati a vista dall'utente. Da fare: estendere agli altri aerei e alle unità; Livello 3 (PBR).
+- **Verifica in Godot (2026-11-14)**: ✅ scena `mission_viewer` con unità, giocatore e punti T2 nelle posizioni del gioco (dati coerenti); mancano scala verificata, terreno, orientamenti, comportamento.

@@ -27,11 +27,13 @@ estratti dal disco originale per uso personale e dati di missione ricostruiti da
 - Strumenti: Godot 4.7.2, Unity Hub 4.0.0 + Editor 6000.6.9f1, Ghidra 12.2 (headless) + JDK 25, binutils MIPS.
 
 **Prossimi passi, in ordine:**
-1. **Decodificare i dati di missione** (nemici, waypoint, trigger) dalle parti 0, 2, 3, 4 dell'entry 166 e dalle tabelle comuni
+1. **Decodificare i campi delle tabelle della parte 2** (già estratta: `parte2_tabelle.json`, SCOPERTE #24–#25; T2 = piazzamento verificato)
+   e poi le parti 0, 3, 4 (terreno) e dalle tabelle comuni
    5/7, aiutandosi con la RAM a missione in corso: pool a `[0x800b8748]` (63 slot × 0x174, coordinate a 32 bit con 11 bit
    frazionari alle parole 9–11 dello slot), tipo → modello con la tabella tipi (`[0x800b84fc]`). Confrontare con Gambit
    (entry 79) per separare dati comuni e specifici. Risultato atteso: `mission/mission.json`.
-2. **Godot**: importare un aereo (es. XFA-27) e un'unità nemica con le texture (gate della Fase 2).
+2. **Godot** (avviato; modernizzazione dell'XFA-27 con geometria morbida + texture 4× approvata dall'utente): ✅ visualizzatore dell'XFA-27 in `engines/godot` (PS1 fedele / moderna, GUIDA §2c). Prossimo: aggiungere
+   un'unità nemica al visualizzatore (gate Fase 2), poi scena di volo (camera, modello di volo arcade, HUD) e terreno.
 3. Audio dal disco reale (XA→WAV) e musica/voci della missione.
 4. Valutare aereo preferito (`+0x34`) e avanzamento (`+0x8b4`) per il gioco "completo"; poi il confronto con Unity.
 
@@ -57,6 +59,8 @@ macchina (non in git). Il `ROOT MENU` si vede in alto a sinistra con glifi sporc
 **Idea in sospeso (non decisa):** un pannello "AC2" nel debug workspace dell'emulatore (ImGui, su un branch
 dedicato, merge a cura dell'utente) con pulsanti per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug
 workspace ha già una *Lua Console* con esecuzione di codice e di file. Rimandato a dopo la prima missione avviata.
+
+Uso di Godot: `docs/GODOT.md`. Strumenti e versioni: `docs/STRUMENTI.md`. Lavoro su più PC: `docs/MULTI_PC.md`.
 
 ## Ambiente: cosa serve su una macchina nuova
 | Cosa | Dove sta | Come si ottiene |
