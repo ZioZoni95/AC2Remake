@@ -40,7 +40,10 @@ python3 -I pipeline/ac2_extract.py iso    "$D"               out/iso      # DAT,
 python3 -I pipeline/ac2_extract.py tims   out/iso/ACE2.DAT   out/tim     # 2.876 PNG
 python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT   out/models  # 146 glTF, ~15 s
 python3 -I pipeline/ac2_aircraft.py export XFA-27 out/aerei               # un aereo giocabile (o `all`)
-python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor          # blocco di Fighter's Honor
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor --subdiv 1 # blocco di Fighter's Honor (+ unità lisce)
+python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144   # terreno con texture originali
+python3 -I pipeline/ac2_audio.py tracks "$D" out/iso/ACE2.STH out/audio                        # 64 tracce audio XA
+./tools/sync_godot_assets.sh && godot --path engines/godot res://scenes/flight_demo.tscn       # demo (tutti i comandi: docs/GODOT.md §14)
 ./run_emulator.sh "Ace Combat 2 (Europe).bin"                            # il gioco
 ```
 

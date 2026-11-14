@@ -34,6 +34,8 @@ python3 pipeline/tests/test_pipeline.py     # 18/18
 python3 -I pipeline/ac2_extract.py iso|tims|models ...   # estrazione (vedi docs/GUIDA.md)
 python3 -I pipeline/ac2_aircraft.py all out/aerei        # 24 aerei con texture
 python3 -I pipeline/ac2_mission.py extract 32 out/fh     # Fighter's Honor (stadio 32)
+python3 -I pipeline/ac2_terrain.py mesh out/fh out/fh/terreno 262144   # terreno; audio: ac2_audio.py tracks; demo: godot --path engines/godot res://scenes/flight_demo.tscn
+# elenco completo e aggiornato dei comandi e dei tasti: docs/GODOT.md §14
 ./run_emulator.sh "Ace Combat 2 (Europe).bin"
 ```
 

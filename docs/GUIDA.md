@@ -208,6 +208,8 @@ python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor    # ~4 s, 2,3 
 #   models/unita_NN.gltf (13 unità texturizzate), parte2_tabelle.json (9 tabelle decodificate), mappa_t2.png, manifest.json
 ```
 
+**Comandi Godot, scene e tasti**: `docs/GODOT.md` §14.
+
 **Audio** (✅ disco reale, 2026-11-14; SCOPERTE #33):
 ```sh
 python3 -I pipeline/ac2_audio.py list "$D"                                       # 7 canali XA stereo 37,8 kHz, ~15 min ciascuno

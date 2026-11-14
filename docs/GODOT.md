@@ -234,3 +234,49 @@ in `scripts/mission_viewer.gd`; modalità e luci in `scripts/terrain_view.gd`.
   sbuffi dietro i missili. Prova: `godot --path engines/godot res://scenes/flight_demo.tscn -- --fx` (un'esplosione 260 m davanti all'aereo al fotogramma 12).
 - Nota di test: a 150 m/s e 10 fotogrammi/s l'aereo percorre 15 m per fotogramma, quindi gli effetti vicini si attraversano in un attimo nelle catture.
 - Limiti: sfondo non perfettamente nero degli sprite (leggero riquadro chiaro), esplosioni a una sola dimensione, nessuna voce radio, nessun suono nella vista dal vivo oltre a motore e musica.
+
+## 14. Riepilogo aggiornato dei comandi (fine sessione 2026-11-14)
+
+**Pipeline completa, nell'ordine** (dalla radice del repo; `$D` = `"$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin"`; tutto in `out/`, ignorato da git):
+```sh
+python3 pipeline/tests/test_pipeline.py                                                       # test: 18/18
+python3 -I pipeline/ac2_extract.py iso "$D" out/iso                                           # DAT, STH, EXE
+python3 -I pipeline/ac2_extract.py tims out/iso/ACE2.DAT out/tim                              # 2.876 PNG (serve e002_1_3.png per le esplosioni)
+python3 -I pipeline/ac2_aircraft.py all out/aerei                                             # 24 aerei
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor --subdiv 1                   # missione: parti, tabelle, 13 unità lisce
+python3 -I pipeline/ac2_export_godot.py out/fighters_honor/parte2_tabelle.json out/fighters_honor/mission.json
+python3 -I pipeline/ac2_terrain.py out/fighters_honor out/fighters_honor/terreno 1024 262144  # altezze (collisione)
+python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144  # mesh con texture e gonne
+python3 -I pipeline/ac2_audio.py tracks "$D" out/iso/ACE2.STH out/audio                       # 64 tracce XA → WAV
+python3 -I pipeline/ac2_sfx_placeholder.py                                                    # effetti sonori segnaposto
+# modernizzazione (Real-ESRGAN: bash tools/install_upscaler.sh, una volta)
+python3 -I tools/upscale_gltf.py out/fighters_honor/terreno/terreno_mesh.gltf --model realesrgan-x4plus
+for f in out/fighters_honor/models/unita_*_smooth1.gltf; do python3 -I tools/upscale_gltf.py "$f"; done
+python3 -I pipeline/ac2_aircraft.py export XFA-27 out/aerei --subdiv 1 && python3 -I tools/upscale_gltf.py out/aerei/xfa27_smooth1.gltf
+./tools/sync_godot_assets.sh                                                                  # copia tutto in engines/godot/assets
+```
+
+**Scene e tasti** (`godot --path engines/godot <scena> [-- argomenti]`):
+
+| Scena | Argomenti | Tasti |
+|---|---|---|
+| `res://scenes/flight_demo.tscn` (demo giocabile) | `--cockpit` parte in cabina, `--fx` prova un'esplosione, `--autotest` prova senza finestra | su/giù beccheggio, sinistra/destra virata, `A`/`D` imbardata, `W`/`S` motore, `Spazio` missile, `C` camera esterna/cabina, `+`/`-` distanza camera, `G` qualità (bassa/media/alta), `N` musica successiva, `R` ricomincia, `Esc` |
+| `res://scenes/live_view.tscn` (logica originale dal vivo) | — (emulatore con `AC2_EXPORT=1`, vedi §11) | `C`, `+`/`-`, `Esc`; si pilota nell'emulatore |
+| `res://scenes/terrain_view.tscn` | `--mode=psx\|modern`, `--cam=x,y,z,imbardata,beccheggio`, `--flat` (diagnostica) | `WASD`, `Q`/`E`, tasto destro + mouse, `Maiusc`, rotella, `M`, `Esc` |
+| `res://scenes/mission_viewer.tscn` | `--cam=player` | `WASD`, `Q`/`E`, tasto destro, `Maiusc`, `[` `]`, `L`, `T`, `Esc` |
+| `res://scenes/aircraft_viewer.tscn` | `--model=res://assets/aerei/xfa27_smooth1_hd.gltf`, `--mode=psx\|modern` | frecce, rotella/`+`/`-`, `Spazio`, `M`, `Esc` |
+
+**Controlli e utilità:**
+```sh
+godot --headless --path engines/godot --import                                                       # importazione senza finestra
+godot --headless --path engines/godot --check-only --script res://scripts/flight_demo.gd             # controllo errori (anche hud.gd, live_view.gd, ...)
+godot --path engines/godot res://scenes/flight_demo.tscn --write-movie /percorso/nome.png --fixed-fps 10 --quit-after 20 -- --fx    # cattura (finestra per qualche secondo)
+```
+Attenzione: più finestre Godot aperte insieme fanno crollare gli FPS (chiudi quelle vecchie prima di lanciarne una nuova).
+
+**Emulatore e interprete MIPS** (SCOPERTE #31):
+```sh
+gcc -O2 -o pipeline/mipsvm/mipsvm pipeline/mipsvm/mipsvm.c pipeline/mipsvm/gte.c pipeline/mipsvm/gte_ops.c        # compila l'interprete
+./pipeline/mipsvm/mipsvm out/ac2_cpuA.bin 8002bcdc 8002a3ec 200000000 out/vm_out.bin                                # esegue FUN_8002bcdc su uno snapshot (STATO START STOP MAX OUT)
+~/Tools/ghidra/support/analyzeHeadless out/ghidra AC2 -process overlay0.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/overlay0   # tutto il codice in C
+```
