@@ -131,3 +131,82 @@ missili, HUD, vittoria a nemici distrutti. **Non rispetta ancora il comportament
 sparano, scala 0,02 m/unità e velocità scelte a mano). Requisito dell'utente: **usare la stessa logica del gioco**. Percorso: portare in GDScript il codice
 decompilato (`out/codice/missione_completa.c`): inizializzazione unità da T1/T4/T5/T6 (`FUN_80046dfc`), interprete azioni T9 (`FUN_8005e348`), nodi di
 comportamento T8 (`FUN_8005ec0c`), manovre T7 (`FUN_8005cab4` e le funzioni di manovra), obiettivi (maschere `0x800b7e84/7e80`), poi il volo del giocatore.
+
+## 9. Terreno con poligoni e texture originali (✅ visibile, 2026-11-14)
+
+```sh
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor                                   # (una volta) parti e texture
+python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144        # mesh glTF del terreno (~4 s)
+./tools/sync_godot_assets.sh
+godot --path engines/godot res://scenes/terrain_view.tscn                                           # visualizzatore
+godot --path engines/godot res://scenes/terrain_view.tscn -- --cam=-940,900,-3500,0,-35              # camera: x,y,z (m), imbardata, beccheggio (gradi)
+```
+Comandi: `WASD` muovi, `Q`/`E` giù/su, tasto destro + mouse guarda, `Maiusc` veloce, rotella = velocità, `Esc`. Il terreno della demo di volo e della vista dal vivo
+usa ancora le altezze colorate (§8): da sostituire con questa mesh. Limiti: orientamento di z e allineamento con le unità da verificare (SCOPERTE #32).
+
+## 10. Missione in versione moderna (✅ 2026-11-14)
+
+Tutto dai dati originali; versione "moderna" = texture ingrandite 4× con Real-ESRGAN, normali morbide, suddivisione 1 sui modelli, luce con ombre, SSAO, glow, cielo.
+
+```sh
+# terreno (poligoni e texture delle tessere; gli edifici dentro le tessere ci sono gia')
+python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144        # terreno_mesh.gltf con normali
+python3 -I tools/upscale_gltf.py out/fighters_honor/terreno/terreno_mesh.gltf --model realesrgan-x4plus  # → terreno_mesh_hd.gltf (25 texture, ~2 min)
+# unità della missione (aerei, strutture, veicoli): 13 modelli
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor --subdiv 1                          # unita_NN_smooth1.gltf
+for f in out/fighters_honor/models/unita_*_smooth1.gltf; do python3 -I tools/upscale_gltf.py "$f" --model realesrgan-x4plus-anime; done   # *_smooth1_hd.gltf (cache: pagine condivise)
+./tools/sync_godot_assets.sh
+godot --path engines/godot res://scenes/terrain_view.tscn           # terreno, tasto M = PS1 fedele / moderno (--mode=psx|modern)
+godot --path engines/godot res://scenes/flight_demo.tscn            # demo con terreno HD, unità HD e XFA-27 HD
+```
+Modelli di upscaling scelti: `realesrgan-x4plus` per il terreno (roccia, più dettaglio naturale), `realesrgan-x4plus-anime` per aerei e strutture (linee nette).
+Le scene usano automaticamente `*_smooth1_hd.gltf` se presenti, altrimenti l'originale. **Difetti noti**: sottili linee bianche orizzontali nel terreno (giunzioni
+tra tessere: bordi di texture o piccoli buchi), orientamento di z e allineamento unità/terreno non verificati, nebbia da tarare, oggetti statici fuori dalle
+tessere (se esistono) non ancora cercati, HUD ed effetti ancora non ridisegnati.
+
+## 11. Riepilogo completo dei comandi Godot (✅ = eseguito e verificato il 2026-11-14)
+
+**Preparazione degli asset** (una volta, dalla radice del repo; i file vanno in `out/` e `engines/godot/assets/`, entrambi ignorati da git):
+```sh
+python3 -I pipeline/ac2_extract.py iso "$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin" out/iso    # ✅ DAT, STH, EXE
+python3 -I pipeline/ac2_aircraft.py all out/aerei                                                                # ✅ 24 aerei
+python3 -I pipeline/ac2_aircraft.py export XFA-27 out/aerei --subdiv 1                                           # ✅ geometria morbida
+python3 -I tools/upscale_gltf.py out/aerei/xfa27_smooth1.gltf                                                    # ✅ texture 4× (anime)
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor --subdiv 1                                      # ✅ missione: parti, tabelle, 13 unità
+python3 -I pipeline/ac2_export_godot.py out/fighters_honor/parte2_tabelle.json out/fighters_honor/mission.json  # ✅ unità T1
+python3 -I pipeline/ac2_terrain.py out/fighters_honor out/fighters_honor/terreno 1024 262144                    # ✅ altezze (collisione)
+python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144                    # ✅ mesh del terreno
+python3 -I tools/upscale_gltf.py out/fighters_honor/terreno/terreno_mesh.gltf --model realesrgan-x4plus         # ✅ terreno HD
+for f in out/fighters_honor/models/unita_*_smooth1.gltf; do python3 -I tools/upscale_gltf.py "$f"; done         # ✅ unità HD
+./tools/sync_godot_assets.sh                                                                                     # ✅ copia in engines/godot/assets
+```
+
+**Scene** (tutte con `godot --path engines/godot <scena>`; argomenti dopo `--`):
+
+| Scena | Cosa mostra | Comandi |
+|---|---|---|
+| (predefinita) `res://scenes/aircraft_viewer.tscn` | un aereo; `--model=res://assets/aerei/xfa27_smooth1_hd.gltf --mode=psx\|modern` | frecce orbita, rotella/`+`/`-` zoom, `Spazio` pausa, `M` modalità, `Esc` |
+| `res://scenes/terrain_view.tscn` | terreno con poligoni e texture originali; `--mode=psx\|modern`, `--cam=x,y,z,imbardata,beccheggio` | `WASD`, `Q`/`E`, tasto destro + mouse, `Maiusc`, rotella, `M`, `Esc` |
+| `res://scenes/mission_viewer.tscn` | le 40 unità della T1 nelle posizioni originali; `--cam=player` | `WASD`, `Q`/`E`, tasto destro, `Maiusc`, `[` `]` ingrandimento, `L` etichette, `T` punti T2, `Esc` |
+| `res://scenes/flight_demo.tscn` | **demo giocabile** (terreno HD, unità HD, XFA-27 moderno, camera ravvicinata); `-- --autotest` stampa e chiude | su/giù beccheggio, sinistra/destra virata, `A`/`D` imbardata, `W`/`S` motore, `Spazio` missile, `R` ricomincia, `Esc` |
+| `res://scenes/live_view.tscn` | **comportamento originale dal vivo**: legge `/tmp/ac2_state.bin` dall'emulatore | si pilota nell'emulatore; `Esc` esce |
+
+**Vista dal vivo** (richiede l'emulatore e il disco):
+```sh
+cd ~/GitHub/ZonistationOne/run
+AC2_EXPORT=1 ZS1_LUA_SCRIPT=$HOME/GitHub/AC2Remake/pipeline/lua/ac2_remote.lua ZS1_LOG_STDERR=1 SDL_VIDEODRIVER=x11 \
+  ../ZoniStation_One ../roms/SCPH-7502.BIN --game="$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin"
+# nell'emulatore: F8 (stato di Fighter's Honor, slot 0); poi, in un altro terminale:
+godot --path ~/GitHub/AC2Remake/engines/godot res://scenes/live_view.tscn
+```
+
+**Utilità:**
+```sh
+godot --headless --path engines/godot --import                                           # ✅ importazione senza finestra
+godot --headless --path engines/godot --check-only --script res://scripts/flight_demo.gd  # ✅ controllo errori di uno script
+godot --headless --path engines/godot res://scenes/flight_demo.tscn -- --autotest        # ✅ prova senza finestra
+godot --path engines/godot res://scenes/terrain_view.tscn --write-movie /percorso/nome.png --fixed-fps 10 --quit-after 5 -- --cam=-940,160,-3500,0,-18   # ✅ cattura (apre una finestra per qualche secondo)
+godot --editor --path engines/godot                                                       # ⚠️ editor, non ancora usato
+```
+Costanti da tarare a mano: `WS` (0,02 m per unità di mondo), velocità (150 m/s), nebbia e camera di inseguimento in `scripts/flight_demo.gd`; ingrandimento dei modelli
+in `scripts/mission_viewer.gd`; modalità e luci in `scripts/terrain_view.gd`.

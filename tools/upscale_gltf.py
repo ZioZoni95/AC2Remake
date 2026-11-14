@@ -8,7 +8,7 @@ Richiede Real-ESRGAN ncnn-vulkan in ~/Tools/realesrgan (tools/install_upscaler.s
 (confronto a vista su XFA-27: meglio di realesrgan-x4plus, che aggiunge grana, e di realesr-animevideov3, piu' sfocato).
 Solo libreria standard; esegue il binario locale gia' installato.
 """
-import json, os, subprocess, sys
+import hashlib, json, os, shutil, subprocess, sys
 
 BIN = os.path.expanduser("~/Tools/realesrgan/realesrgan-ncnn-vulkan")
 
@@ -29,8 +29,14 @@ def main():
         uri = img["uri"]
         if uri not in done:
             out = os.path.splitext(uri)[0] + "_hd.png"
+            # cache per contenuto: pagine identiche (stessa tpage/clut) condivise da piu' modelli si ingrandiscono una volta sola
+            h = hashlib.sha1(open(os.path.join(d, uri), "rb").read() + model.encode() + scale.encode()).hexdigest()
+            cdir = os.path.join(d, ".hd_cache"); os.makedirs(cdir, exist_ok=True); cf = os.path.join(cdir, h + ".png")
+            if os.path.exists(cf):
+                shutil.copyfile(cf, os.path.join(d, out)); done[uri] = out; print(f"  {uri} -> {out} (cache)"); img["uri"] = out; continue
             subprocess.run([BIN, "-i", os.path.join(d, uri), "-o", os.path.join(d, out), "-n", model, "-s", scale,
                             "-m", os.path.dirname(BIN) + "/models"], check=True, capture_output=True)
+            shutil.copyfile(os.path.join(d, out), cf)
             done[uri] = out
             print(f"  {uri} -> {out}")
         img["uri"] = done[uri]

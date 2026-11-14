@@ -43,7 +43,7 @@ func _ready() -> void:
 	env.environment.background_mode = Environment.BG_SKY; env.environment.sky = sky
 	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.environment.fog_enabled = true; env.environment.fog_density = 0.0006
+	env.environment.fog_enabled = true; env.environment.fog_density = 0.00015
 	env.environment.fog_light_color = Color(0.72, 0.80, 0.90)
 	add_child(env)
 	var sun := DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-45, 35, 0); sun.shadow_enabled = true
@@ -97,7 +97,12 @@ func _load_terrain() -> void:
 	st.generate_normals()
 	var mi := MeshInstance3D.new(); mi.mesh = st.commit()
 	var m := StandardMaterial3D.new(); m.vertex_color_use_as_albedo = true; m.roughness = 0.9
-	mi.material_override = m; add_child(mi)
+	mi.material_override = m; mi.visible = false; add_child(mi)   # solo collisione: il terreno disegnato e' la mesh originale HD
+	var real := _load_model(DIR + "terreno_mesh_hd.gltf")
+	if real != null:
+		add_child(real)
+	else:
+		mi.visible = true
 	# nessun mare: nel gioco le tessere senza dati (magic 0x5907) sono pianura a quota fissa (FUN_8002703c)
 	var plain := MeshInstance3D.new(); var pl := PlaneMesh.new(); pl.size = Vector2(60000, 60000); plain.mesh = pl
 	var pmat := StandardMaterial3D.new(); pmat.albedo_color = Color(0.30, 0.42, 0.22); pmat.roughness = 1.0
@@ -134,7 +139,10 @@ func _spawn_unit(u: Dictionary) -> void:
 	_units.append({"node": node, "alive": true, "enemy": enemy, "air": air, "c": p, "ph": randf() * TAU, "slot": u["slot"], "mk": mk})
 
 func _make_unit(t: int) -> Node3D:
-	var path := DIR + "unita_%02d.gltf" % (3 * clampi(t, 0, 12) + 2)
+	var base := "unita_%02d" % (3 * clampi(t, 0, 12) + 2)
+	var path := DIR + base + ".gltf"
+	if FileAccess.file_exists(DIR + base + "_smooth1_hd.gltf"):
+		path = DIR + base + "_smooth1_hd.gltf"
 	if not _cache.has(path):
 		_cache[path] = _load_model(path)
 	var tm: Node = _cache[path]
@@ -282,9 +290,9 @@ func _update_fx(dt: float) -> void:
 			(f["n"] as Node3D).queue_free(); _fx.remove_at(i)
 
 func _update_cam(dt: float) -> void:
-	var want := _player.position + _player.basis * Vector3(0, 3.2, 11.0)
+	var want := _player.position + _player.basis * Vector3(0, 2.0, 6.5)   # camera di inseguimento vicina
 	_cam.position = _cam.position.lerp(want, clampf(dt * 6.0, 0, 1))
-	_cam.look_at(_player.position + _player.basis * Vector3(0, 1.0, -14.0), _player.basis.y)
+	_cam.look_at(_player.position + _player.basis * Vector3(0, 0.8, -10.0), _player.basis.y)
 
 func _update_hud() -> void:
 	var alt := _player.position.y - ground_m(_player.position)

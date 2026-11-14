@@ -88,7 +88,10 @@ func _w2g(p: Array) -> Vector3:
 	return Vector3(p[0] * SCALE, -p[1] * SCALE, p[2] * SCALE)
 
 func _make_unit(t: int) -> Node3D:
-	var path := DIR + "unita_%02d.gltf" % (3 * clampi(t, 0, 12) + 2)
+	var base := "unita_%02d" % (3 * clampi(t, 0, 12) + 2)
+	var path := DIR + base + ".gltf"
+	if FileAccess.file_exists(DIR + base + "_smooth1_hd.gltf"):
+		path = DIR + base + "_smooth1_hd.gltf"
 	if not _cache.has(path):
 		_cache[path] = _load_model(path)
 	var tmpl: Node = _cache[path]

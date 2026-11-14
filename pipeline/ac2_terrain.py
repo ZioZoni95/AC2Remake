@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """ac2_terrain — altezza del suolo di una missione, replica di FUN_8002703c (uso personale, output NON versionato).
 
+  ac2_terrain.py mesh DIR_MISSIONE OUT [MEZZO_LATO]   mesh glTF del terreno con poligoni e texture vere (tessere, SCOPERTE #32)
   ac2_terrain.py DIR_MISSIONE OUT [PASSO [MEZZO_LATO]]   DIR_MISSIONE = cartella di ac2_mission.py extract (part00/03/04.bin);
   PASSO in unita' (default 1024), MEZZO_LATO = ritaglio centrato in (0,0) (default 524288 = tutto il mondo)
 
@@ -43,6 +44,74 @@ class Terrain:
         return ((min(h, base) - 0x20000) >> 11) + 30
 
 
+TILE = 4096
+
+
+def parse_tile(P, o, nxt):
+    """Tessera (SCOPERTE #32): header 16 B [short y0, y1, flag, 0x5907][byte nv_per_LOD][byte n_prim][u16 offset prim];
+    vertici s16 (x,y,z,0) da +0x10, 2*nv (LOD vicino, poi lontano); prim: 0x24 = triangolo texturizzato 36 B
+    [i0 i1 i2 pad][r g b code][u0 v0 clut16][u1 v1 tpage16][u2 v2 pad] + secondo set UV (12 B) + 4 B di flag;
+    0x2c = quadrilatero 44 B (4 indici, 4 UV per set). Coordinate locali: mondo = centro tessera + 2*locale."""
+    nv, npr = P[o + 8], P[o + 9]
+    poff = struct.unpack_from("<H", P, o + 10)[0]
+    verts = [struct.unpack_from("<3h", P, o + 0x10 + 8 * i) for i in range(nv)]     # solo LOD vicino
+    prims = []
+    q = o + poff
+    for _ in range(npr):
+        code = P[q + 7]
+        if code == 0x24: n, rs = 3, 36
+        elif code == 0x2c: n, rs = 4, 44
+        else: break
+        idx = tuple(P[q:q + n])
+        col = tuple(P[q + 4:q + 7])
+        uvs = []; clut = tpage = 0
+        for k in range(n):
+            base = q + 8 + 4 * k
+            uvs.append((P[base], P[base + 1]))
+            if k == 0: clut = struct.unpack_from("<H", P, base + 2)[0]
+            if k == 1: tpage = struct.unpack_from("<H", P, base + 2)[0]
+        prims.append((idx, col, uvs, clut, tpage))
+        q += rs
+    return verts, prims
+
+
+def build_mesh(d, out, half=262144):
+    """Mesh del terreno (poligoni e texture vere) nel ritaglio +-half, in out/terreno_mesh.gltf (+ PNG per tpage/clut)."""
+    import acemodel, ac2_extract as X
+    T = Terrain(d)
+    vram = acemodel.vram_new()
+    for part in ("part08.bin", "part09.bin"):
+        b = open(os.path.join(d, part), "rb").read()
+        for _tag, tim in X.walk(b, "p"):
+            acemodel.vram_apply_tim(vram, tim)
+    P = T.p0
+    srt = sorted(set(T.tiles))
+    cache = {}
+    def tile(t):
+        if t not in cache:
+            o = T.tiles[t]; nxt = min([x for x in srt if x > o] + [len(P)])
+            cache[t] = parse_tile(P, o, nxt)
+        return cache[t]
+    verts, faces = [], []
+    lo = (-half + 524288) // TILE; hi = (half + 524288) // TILE
+    for v in range(256):
+        for u in range(lo, hi):
+            zc = 528384 - v * TILE - TILE // 2
+            if not (-half <= zc < half): continue
+            t = T.map[v * 256 + u]
+            lv, prims = tile(t)
+            xc = u * TILE - 524288 + TILE // 2
+            b0 = len(verts)
+            for (lx, ly, lz) in lv:
+                verts.append((xc + 2 * lx, 2 * ly, zc + 2 * lz))
+            for idx, col, uvs, clut, tpage in prims:
+                faces.append((tuple(b0 + i for i in idx), [col] * len(idx), uvs, clut, tpage))
+    m = {"verts": verts, "faces": faces}
+    os.makedirs(out, exist_ok=True)
+    g = acemodel.to_gltf_vram(m, vram, os.path.join(out, "terreno_mesh"), scale=0.02, smooth=True)   # normali morbide per la luce
+    print(f"mesh terreno: {len(verts)} vertici, {len(faces)} poligoni, {len(set((f[4], f[3]) for f in faces))} texture -> {g}")
+
+
 def main(d, out, step=1024, half=524288):
     T = Terrain(d)
     os.makedirs(out, exist_ok=True)
@@ -61,6 +130,8 @@ def main(d, out, step=1024, half=524288):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 4 and sys.argv[1] == "mesh":
+        build_mesh(sys.argv[2], sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 262144); sys.exit(0)
     if len(sys.argv) < 3:
         print(__doc__); sys.exit(2)
     main(sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 1024, int(sys.argv[4]) if len(sys.argv) > 4 else 524288)

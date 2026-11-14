@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ac2_mission — estrae il blocco dati di una missione di Ace Combat 2 (uso personale, output NON versionato).
 
-  ac2_mission.py extract STADIO OUTDIR [VARIANTE]     STADIO 0..32 (0 Gambit ... 32 Fighter's Honor), VARIANTE 0..2 (default 1)
+  ac2_mission.py extract STADIO OUTDIR [VARIANTE] [--subdiv N]   (--subdiv: modelli *_smoothN con normali morbide e N suddivisioni)     STADIO 0..32 (0 Gambit ... 32 Fighter's Honor), VARIANTE 0..2 (default 1)
 
 Produce in OUTDIR: parti grezze (partNN.bin), texture dei TIM (tex/*.png), VRAM ricostruita (vram.png),
 modelli delle unita' texturizzati (models/*.gltf) e manifest.json con dimensioni, coordinate VRAM e conteggi.
@@ -97,7 +97,7 @@ def decode_units(p, offs):
     return res
 
 
-def extract(stage, outdir, variant=1, dat="out/iso/ACE2.DAT"):
+def extract(stage, outdir, variant=1, dat="out/iso/ACE2.DAT", subdiv=0):
     e = entry_for(stage, variant)
     ents = X.read_dat(dat)
     with open(dat, "rb") as f:
@@ -133,9 +133,9 @@ def extract(stage, outdir, variant=1, dat="out/iso/ACE2.DAT"):
                 m = acemodel.parse_geometry(s)
             except Exception:
                 continue
-            base = os.path.join(outdir, "models", f"unita_{j:02d}")
+            base = os.path.join(outdir, "models", f"unita_{j:02d}" + (f"_smooth{subdiv}" if subdiv else ""))
             acemodel.to_obj(m, base + ".obj")
-            acemodel.to_gltf_vram(m, vram, base)
+            acemodel.to_gltf_vram(m, vram, base, smooth=bool(subdiv), subdiv=subdiv)
             man["modelli"].append({"elemento": j, "tipo": j // 3, "lod": j % 3, "vertici": len(m["verts"]),
                                    "gt3": len(m["tris"]), "gt4": len(m["quads"])})
     if len(parts) > 2:
@@ -164,4 +164,6 @@ def extract(stage, outdir, variant=1, dat="out/iso/ACE2.DAT"):
 if __name__ == "__main__":
     if len(sys.argv) < 4 or sys.argv[1] != "extract":
         print(__doc__); sys.exit(2)
-    extract(int(sys.argv[2]), sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 1)
+    sd = int(sys.argv[sys.argv.index("--subdiv") + 1]) if "--subdiv" in sys.argv else 0
+    pos = [a for a in sys.argv[4:] if not a.startswith("--") and a != str(sd)]
+    extract(int(sys.argv[2]), sys.argv[3], int(pos[0]) if pos else 1, subdiv=sd)
