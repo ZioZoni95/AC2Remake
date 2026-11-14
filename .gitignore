@@ -1,3 +1,7 @@
+# Python
+__pycache__/
+*.pyc
+
 # Asset estratti dal disco Ace Combat 2 (Namco/Sony): uso personale, NON versionare,
 # quindi non finiscono mai in un push verso remoto.
 assets/models/
