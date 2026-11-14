@@ -116,3 +116,18 @@ modelli (solo per vederli, default ×25), `L` = etichette (`#slot cCATEGORIA sSQ
 Limiti: scala di mondo ipotetica (0,01 m per unità), suolo piatto a quota 0 (11 unità sono "appoggiate al suolo" e il terreno non è decodificato),
 nessun orientamento delle unità, tipo del modello delle unità in volo ancora ipotetico (usato 0). `P` (segnaposto parcheggiati) non esiste più: le 5 unità
 di sottotipo 25 sono unità vere e compaiono con le altre.
+
+## 8. Demo di volo (✅ gira, 2026-11-14; semplificata)
+
+```sh
+python3 -I pipeline/ac2_terrain.py out/fighters_honor out/fighters_honor/terreno 1024 262144   # altezze del suolo
+./tools/sync_godot_assets.sh
+godot --path engines/godot res://scenes/flight_demo.tscn                      # demo giocabile
+godot --headless --path engines/godot res://scenes/flight_demo.tscn -- --autotest   # prova senza finestra (stampa "AUTOTEST ...")
+```
+Comandi: su/giù beccheggio, sinistra/destra virata con rollio, `A`/`D` imbardata, `W`/`S` motore, `Spazio` missile (guida sul bersaglio in mira), `R` ricomincia, `Esc` esci.
+Contiene: terreno dalle altezze originali (SCOPERTE #30), le 39 unità della T1 con il modello del loro tipo e un marcatore (rosso = nemico, verde = squadra 0),
+missili, HUD, vittoria a nemici distrutti. **Non rispetta ancora il comportamento originale**: la logica è mia (aerei in cerchio, terrestri fermi, nemici che non
+sparano, scala 0,02 m/unità e velocità scelte a mano). Requisito dell'utente: **usare la stessa logica del gioco**. Percorso: portare in GDScript il codice
+decompilato (`out/codice/missione_completa.c`): inizializzazione unità da T1/T4/T5/T6 (`FUN_80046dfc`), interprete azioni T9 (`FUN_8005e348`), nodi di
+comportamento T8 (`FUN_8005ec0c`), manovre T7 (`FUN_8005cab4` e le funzioni di manovra), obiettivi (maschere `0x800b7e84/7e80`), poi il volo del giocatore.

@@ -47,7 +47,33 @@ def decode_part2(p):
     for r in out["tabelle"]["T2"]["record_dati"]:
         r["pos"] = r["s32"][2:5]
     out["unita"] = decode_units(p, offs)
+    out["script"] = decode_script(p, offs)
     return out
+
+
+AZIONI = {0: "attiva_unita", 1: "azzera_stato_unita", 2: "danno_hp", 3: "obiettivo_A", 4: "obiettivo_B", 5: "fine_missione_4",
+          6: "fine_missione_0x10", 7: "messaggio_radio", 8: "azzera_flag_unita", 9: "marcatore", 10: "sequenza_messaggi", 11: "dissolvenza"}
+
+
+def decode_script(p, offs):
+    """T9 = azioni (12 B; byte0!=0 -> gruppo di indici T9, byte0==0 -> byte1 = codice azione, arg s32 a +4/+8), interprete
+    FUN_8005e348. T8 = nodi di comportamento (24 B; tipo 0 = foglia con dati di rotta, tipo 1 = ramo con successori), FUN_8005ec0c.
+    T10+0x46/+0x47 = soglie degli obiettivi A/B. Semantica dei campi dei nodi T8 ancora in parte ipotetica (SCOPERTE #28)."""
+    def tab(t, rs):
+        o = offs[t - 1]; n = struct.unpack_from("<I", p, o)[0]
+        return [p[o + 4 + i * rs:o + 4 + (i + 1) * rs] for i in range(n)]
+    t9 = []
+    for i, r in enumerate(tab(9, 12)):
+        if r[0]:
+            t9.append({"i": i, "gruppo": list(r[2:2 + r[1]])})
+        else:
+            t9.append({"i": i, "azione": AZIONI.get(r[1], r[1]), "codice": r[1], "arg4": struct.unpack_from("<i", r, 4)[0],
+                       "arg8": struct.unpack_from("<i", r, 8)[0]})
+    t8 = [{"i": i, "tipo": r[0], "n": r[1], "successori": list(r[2:2 + r[1]]) if r[0] == 1 else [], "hex": r.hex()}
+          for i, r in enumerate(tab(8, 24))]
+    t10 = p[offs[9]:offs[9] + 76]
+    return {"T9_azioni": t9, "T8_nodi": t8, "soglie_obiettivi": [t10[0x46], t10[0x47]],
+            "T3_hex": [r.hex() for r in tab(3, 8)]}
 
 
 def decode_units(p, offs):

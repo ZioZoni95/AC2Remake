@@ -69,8 +69,21 @@ function start_stage(stage, plane)
   log("start_stage(%d, %d): modulo 4 richiesto", stage, plane or 0)
 end
 
+-- Esportazione dello stato per Godot (SCOPERTE #31): se AC2_EXPORT e' impostata, a ogni vblank scrive /tmp/ac2_state.bin
+-- = [u32 frame][oggetto giocatore 0x3f8 B @ [0x800b84ac]][63 slot x 0x174 B @ [0x800b8748]][camera 0x60 B @ 0x800bc5a0]
+-- (parole s32 little endian: posizione = parole 9..11 / 2048, angoli = parole 13..15, 4096 = giro intero). Scrittura atomica (rename).
+local EXPORT = os.getenv("AC2_EXPORT") ~= nil
+local function export_state()
+  local t = { string.pack("<I4", frame) }
+  local function dump(a, n) for i = 0, n // 4 - 1 do t[#t + 1] = string.pack("<I4", rd32(a + i * 4)) end end
+  dump(rd32(0x800b84ac), 0x3f8); dump(rd32(0x800b8748), 63 * 0x174); dump(0x800bc5a0, 0x60)
+  local f = io.open("/tmp/ac2_state.tmp", "wb"); f:write(table.concat(t)); f:close()
+  os.rename("/tmp/ac2_state.tmp", "/tmp/ac2_state.bin")
+end
+
 emu.on_event(function(ev)
   frame = frame + 1
+  if EXPORT and loaded and frame % 2 == 0 then export_state() end
   if CDLOG then
     local cd = emu.cd_state()
     if cd.drive_state == 3 then

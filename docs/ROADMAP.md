@@ -73,3 +73,4 @@ Piano a fasi con gate espliciti. Ogni fase si chiude solo con una consegna verif
   a mano con `tools/install_upscaler.sh`); Livello 3 (PBR) da fare. Banco di prova: XFA-27.
 - **Modernizzazione (D13) aggiornata**: ✅ Livello 1 (upscaling Real-ESRGAN `x4plus-anime`) e ✅ Livello 2 sull'XFA-27, approvati a vista dall'utente. Da fare: estendere agli altri aerei e alle unità; Livello 3 (PBR).
 - **Verifica in Godot (2026-11-14)**: ✅ scena `mission_viewer` con unità, giocatore e punti T2 nelle posizioni del gioco (dati coerenti); mancano scala verificata, terreno, orientamenti, comportamento.
+- **Porting del codice originale (via 1)**: ✅ interprete MIPS verificato (unità e stato globale identici all'emulatore su un fotogramma intero); da fare: joypad e tempo, GDExtension in Godot, disegno con Godot, caricamento dal DAT senza snapshot.

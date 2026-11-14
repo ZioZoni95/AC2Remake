@@ -33,3 +33,6 @@ out/
 engines/godot/assets/
 engines/godot/.godot/
 *.import
+
+# interprete MIPS compilato
+pipeline/mipsvm/mipsvm
