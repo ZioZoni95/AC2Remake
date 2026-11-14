@@ -12,6 +12,7 @@ utilizzabili da qualunque motore (Godot 4, Unity). Nessuna dipendenza esterna: s
 | `tim2png.py` | immagini TIM (4/8/16/24 bpp, CLUT BGR555) → PNG | ✅ fixture |
 | `tmd2gltf.py` | modelli TMD → OBJ + glTF 2.0 | ✅ fixture (calibrare layout su file reali) |
 | `ace2arc.py` | directory dell'archivio ACE2.DAT / ACE2.STH→STP, estrazione per indice, sniff TIM/TMD | ✅ fixture |
+| `acemodel.py` | modelli AC2 (non TMD): vertici + GT3/GT4 → OBJ; formato in SCOPERTE #8 | ✅ fixture + 146 geometrie reali |
 | `pngout.py` | scrittore PNG RGB (stdlib zlib), usato da tim2png | — |
 | `tests/test_pipeline.py` | fixture sintetiche: immagine CD, TIM, TMD, XA, directory ACE2 | 15/15 |
 

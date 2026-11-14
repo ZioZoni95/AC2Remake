@@ -15,6 +15,7 @@ import wave
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import psxcd            # noqa: E402
+import acemodel         # noqa: E402
 import tim2png          # noqa: E402
 import tmd2gltf         # noqa: E402
 import xa_audio         # noqa: E402
@@ -171,6 +172,15 @@ def main():
     w4, h4, rows4 = tim2png.decode(t4)
     idx4 = [round(rows4[r][c * 3 + 1] * 31 / 255) for r in range(h4) for c in range(w4)]
     check("tim: 4bpp ordine nibble", (w4, h4) == (4, 2) and idx4 == [1, 2, 3, 4, 5, 6, 7, 8])
+
+    # acemodel: 4 vertici (header 8 B con offset primitive), 1 GT3 + 1 GT4
+    vs = b"".join(struct.pack("<4h", x, y, z, 0) for x, y, z in [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0)])
+    gt3 = bytes([0, 1, 2, 0]) + bytes([9, 9, 9, 0x34]) * 3 + bytes([0, 0, 1, 0, 8, 0, 2, 0, 8, 8, 0, 0])
+    gt4 = bytes([0, 1, 2, 3]) + bytes([9, 9, 9, 0x3C]) * 4 + bytes([0, 0, 1, 0, 8, 0, 2, 0, 0, 8, 0, 0, 8, 8, 0, 0])
+    geo = struct.pack("<IHH", 0, 0, 8 + len(vs)) + vs + gt3 + gt4
+    m = acemodel.parse_geometry(geo)
+    check("acemodel: 4 vertici, 1 GT3, 1 GT4",
+          len(m["verts"]) == 4 and len(m["tris"]) == 1 and len(m["quads"]) == 1)
 
     tmd_data = open(psxcd.extract_file(disc, dict(files)["MODEL.TMD"], out), "rb").read()
     objs = tmd2gltf.parse(tmd_data)
