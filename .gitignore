@@ -1,0 +1,25 @@
+# Asset estratti dal disco Ace Combat 2 (Namco/Sony): uso personale, NON versionare,
+# quindi non finiscono mai in un push verso remoto.
+assets/models/
+assets/textures/
+assets/audio/
+mission/extracted/
+pipeline/.cache/
+
+# Disc image e file sensibili
+*.bin
+*.ecm
+*.cue
+*.sbi
+*.iso
+
+# Godot
+engines/godot/.godot/
+
+# Unity
+engines/unity/Library/
+engines/unity/Temp/
+engines/unity/Logs/
+engines/unity/UserSettings/
+engines/unity/[Oo]bj/
+engines/unity/[Bb]uild/
