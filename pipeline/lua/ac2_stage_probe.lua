@@ -12,7 +12,11 @@ emu.on_event(function(ev)
     local blk = math.floor((lba - DAT_LBA) / 16)    -- blocchi da 32 KiB
     if blk ~= last_blk and (lba - last_log) > 64 then
       last_blk, last_log = blk, lba
-      emu.log(string.format("[CD] lba=%d dat_off=0x%x", lba, (lba - DAT_LBA) * 2048))
+      if lba < 47886 then
+        emu.log(string.format("[CD] lba=%d DAT off=0x%x", lba, (lba - DAT_LBA) * 2048))
+      else  -- ACE2.STH a 47886, ACE2.STP (streaming audio/FMV) da 47887
+        emu.log(string.format("[CD] lba=%d STP off=0x%x", lba, (lba - 47887) * 2048))
+      end
     end
   end
 end, "vblank")
