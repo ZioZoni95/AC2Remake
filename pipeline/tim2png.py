@@ -51,8 +51,8 @@ def decode(data):
             base = r * w * 2
             for c in range(width):
                 if pmode == 0:
-                    byte = body[base + c // 4]
-                    idx = byte >> ((c % 4) * 4) & 0xF
+                    byte = body[base + c // 2]
+                    idx = byte >> ((c % 2) * 4) & 0xF
                 else:
                     idx = body[base + c]
                 row.extend(clut[idx] if clut and idx < len(clut) else (255, 0, 255))

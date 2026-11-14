@@ -163,6 +163,15 @@ def main():
     tim2png.to_png(tim_data, p)
     check("tim: png scritto", os.path.exists(p) and os.path.getsize(p) > 60)
 
+    # 4bpp+CLUT: 2 pixel per byte, nibble basso = pixel sinistro (regressione c//4 → c//2)
+    clut = struct.pack("<IhhHH", 12 + 2 * 16, 0, 0, 16, 1) + b"".join(
+        struct.pack("<H", i << 5) for i in range(16))        # indice i → verde i
+    img4 = struct.pack("<IhhHH", 12 + 4, 0, 0, 1, 2) + bytes([0x21, 0x43, 0x65, 0x87])
+    t4 = struct.pack("<II", 0x10, 8) + clut + img4
+    w4, h4, rows4 = tim2png.decode(t4)
+    idx4 = [round(rows4[r][c * 3 + 1] * 31 / 255) for r in range(h4) for c in range(w4)]
+    check("tim: 4bpp ordine nibble", (w4, h4) == (4, 2) and idx4 == [1, 2, 3, 4, 5, 6, 7, 8])
+
     tmd_data = open(psxcd.extract_file(disc, dict(files)["MODEL.TMD"], out), "rb").read()
     objs = tmd2gltf.parse(tmd_data)
     check("tmd: 1 oggetto", len(objs) == 1)
