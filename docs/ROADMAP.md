@@ -26,7 +26,7 @@ Piano a fasi con gate espliciti. Ogni fase si chiude solo con una consegna verif
 
 ## Fase 3 — Reverse-ing. missione ▶️ (scelta: **Fighter's Honor**, ultima missione secondo l'utente)
 - [x] Missione scelta e titoli/briefing localizzati nel DAT (SCOPERTE #10)
-- [x] `emu.write_u8/16/32` nell'emulatore (branch `feature/lua-memory-write`, commit 210d6c9) per forzare lo stato da una sonda
+- [x] `emu.write_u8/16/32` nell'emulatore (branch `feature/lua-memory-write`, commit c59eb77) per forzare lo stato da una sonda
 - [x] Trovato il formato del salvataggio (860 B + checksum a somma byte, blocco vivo a `[0x801de228]+0x8b4`, SCOPERTE #11)
 - [ ] Dump del blocco di avanzamento al menu; decodifica dei campi (missioni completate, aerei, punti, flag Free Mission)
 - [ ] **Avvio diretto della missione senza savestate**: dal log del caricamento disco (letture LBA ↔ entry DAT) trovare variabile stadio/flag di sblocco, poi forzarla con `emu.write_*`
