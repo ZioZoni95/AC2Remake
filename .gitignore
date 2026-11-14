@@ -27,3 +27,4 @@ engines/unity/Logs/
 engines/unity/UserSettings/
 engines/unity/[Oo]bj/
 engines/unity/[Bb]uild/
+out/
