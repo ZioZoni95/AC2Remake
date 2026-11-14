@@ -16,6 +16,8 @@ utilizzabili da qualunque motore (Godot 4, Unity). Nessuna dipendenza esterna: s
 | `mipsvm/` | interprete MIPS R3000 + GTE per eseguire il codice originale su uno snapshot (SCOPERTE #31): `gcc -O2 -o mipsvm mipsvm.c gte.c gte_ops.c` | ✅ 0 diff sulle unità |
 | `ac2_export_godot.py` | `parte2_tabelle.json` → `mission.json` per la scena Godot (40 unità T1 con posizione, categoria, squadra, tipo; punti T2) | ✅ FH |
 | `ghidra/ExportAll.java` | decompila tutte le funzioni di un binario in un file C + indice (base del reverse del codice di missione) | ✅ |
+| `ac2_audio.py` | flussi XA di ACE2.STP: `list`, `extract`, `tracks` (64 tracce STH → WAV) | ✅ disco reale |
+| `ac2_sfx_placeholder.py` | effetti sonori SEGNAPOSTO sintetici (motore, lancio, esplosione, aggancio) | ✅ (non originali) |
 | `ac2_snapshot.py` | snapshot di RAM/VRAM di una missione in corso → elenco unità (JSON), mappa dall'alto, VRAM in PNG | ✅ FH |
 | `ac2_mission.py` | blocco dati di una missione (`extract STADIO OUT`): parti grezze, TIM→PNG, VRAM ricostruita, modelli delle unità texturizzati, manifest | ✅ stadio 32 |
 | `ac2_extract.py` | estrazione in blocco dal disco: `iso`, `tims` (2.876 PNG), `models` (146 glTF texturizzati) | ✅ disco reale |

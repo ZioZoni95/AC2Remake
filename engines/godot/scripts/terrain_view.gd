@@ -50,6 +50,8 @@ func _load(path: String, modern: bool) -> Node3D:
 				else:
 					d.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 					d.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+				if OS.get_cmdline_user_args().has("--flat"):   # diagnostica: grigio uniforme senza texture
+					d = StandardMaterial3D.new(); d.albedo_color = Color(0.45, 0.45, 0.45); d.cull_mode = BaseMaterial3D.CULL_DISABLED
 				m.set_surface_override_material(s, d)
 	return root
 

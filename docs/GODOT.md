@@ -188,8 +188,8 @@ for f in out/fighters_honor/models/unita_*_smooth1.gltf; do python3 -I tools/ups
 | (predefinita) `res://scenes/aircraft_viewer.tscn` | un aereo; `--model=res://assets/aerei/xfa27_smooth1_hd.gltf --mode=psx\|modern` | frecce orbita, rotella/`+`/`-` zoom, `Spazio` pausa, `M` modalità, `Esc` |
 | `res://scenes/terrain_view.tscn` | terreno con poligoni e texture originali; `--mode=psx\|modern`, `--cam=x,y,z,imbardata,beccheggio` | `WASD`, `Q`/`E`, tasto destro + mouse, `Maiusc`, rotella, `M`, `Esc` |
 | `res://scenes/mission_viewer.tscn` | le 40 unità della T1 nelle posizioni originali; `--cam=player` | `WASD`, `Q`/`E`, tasto destro, `Maiusc`, `[` `]` ingrandimento, `L` etichette, `T` punti T2, `Esc` |
-| `res://scenes/flight_demo.tscn` | **demo giocabile** (terreno HD, unità HD, XFA-27 moderno, camera ravvicinata); `-- --autotest` stampa e chiude | su/giù beccheggio, sinistra/destra virata, `A`/`D` imbardata, `W`/`S` motore, `Spazio` missile, `R` ricomincia, `Esc` |
-| `res://scenes/live_view.tscn` | **comportamento originale dal vivo**: legge `/tmp/ac2_state.bin` dall'emulatore | si pilota nell'emulatore; `Esc` esce |
+| `res://scenes/flight_demo.tscn` | **demo giocabile** (terreno HD con gonne, unità HD, XFA-27 moderno, HUD); `-- --autotest` stampa e chiude; `-- --cockpit` parte in cabina | su/giù beccheggio, sinistra/destra virata, `A`/`D` imbardata, `W`/`S` motore, `Spazio` missile, **`C` camera esterna/cabina**, **`+`/`-` distanza camera**, **`G` qualità (bassa/media/alta)**, **`N` traccia musicale successiva**, `R` ricomincia, `Esc`; `-- --fx` prova un'esplosione |
+| `res://scenes/live_view.tscn` | **comportamento originale dal vivo**: legge `/tmp/ac2_state.bin` dall'emulatore; HUD e cabina come la demo | si pilota nell'emulatore; `C` camera, `+`/`-` distanza, `Esc` |
 
 **Vista dal vivo** (richiede l'emulatore e il disco):
 ```sh
@@ -210,3 +210,27 @@ godot --editor --path engines/godot                                             
 ```
 Costanti da tarare a mano: `WS` (0,02 m per unità di mondo), velocità (150 m/s), nebbia e camera di inseguimento in `scripts/flight_demo.gd`; ingrandimento dei modelli
 in `scripts/mission_viewer.gd`; modalità e luci in `scripts/terrain_view.gd`.
+
+## 12. HUD, camere e qualità (✅ 2026-11-14)
+
+- **HUD** (`scripts/hud.gd`, disegnato in 2D, stile Ace Combat): bussola in alto con prua, orizzonte artificiale con scala di beccheggio che ruota col rollio,
+  velocità (km/h) e quota (m) ai lati, barra motore, radar circolare (4 km) con i nemici, mirino, riquadro del bersaglio con distanza (solo nella demo: nella vista dal vivo
+  il bersagliamento del gioco non è decodificato), munizioni, nemici rimasti, danno (sempre 0% per ora). I dati arrivano da `_hud_data()` in `flight_demo.gd`.
+- **Camera** (`C`): esterna di inseguimento (distanza e campo visivo crescono con la velocità; nessun ritardo sulla posizione) o **cabina** (vista dal naso, modello nascosto).
+- **Qualità** (`G`): 0 bassa (niente SSAO, glow, ombre, antialiasing), 1 **media** predefinita (glow, ombre vicine, FXAA), 2 alta (anche SSAO e MSAA 2×). Il terreno non proietta ombre
+  (le cascate lo ridisegnavano 5 volte: era la causa principale del calo di FPS). Godot usa la GTX 1050 (verificato nel log, "Using Device #1: NVIDIA").
+- **Colori**: cielo più profondo, nebbia azzurra, contrasto/saturazione (`adjustment_*`), terreno opaco senza riflessi (lo schermo era troppo bianco). Le palette ricostruite dai TIM sono più
+  scure di quelle che il gioco ha in VRAM (il gioco le schiarisce a runtime: 12.582 word di CLUT diverse): da replicare, ancora non fatto.
+- **Gonne del terreno**: pareti verticali dove i bordi di tessere adiacenti hanno quote diverse (coprivano le linee bianche, che erano buchi nella geometria).
+- **Da fare per le prestazioni**: dividere il terreno in blocchi per il frustum culling (oggi è una sola mesh per texture), livelli di dettaglio, texture compresse.
+
+## 13. Audio ed effetti (✅ 2026-11-14, versione segnaposto per gli effetti sonori)
+
+- **Musica**: le tracce originali XA decodificate (`ac2_audio.py tracks`), copiate in `engines/godot/assets/audio/` da `tools/sync_godot_assets.sh` (le prime sette: `traccia_00…06`).
+  Nella demo suona la traccia 00 in ciclo; **`N`** passa alla successiva (il nome è nella riga in alto). Quale sia la musica vera di Fighter's Honor non è ancora noto: ascolta e dimmi.
+- **Effetti sonori**: motore (il tono segue il gas e la velocità), lancio missile, esplosione e bip di aggancio del bersaglio sono **sintetizzati** (`ac2_sfx_placeholder.py`),
+  NON originali. Il banco sonoro originale non è stato localizzato (SCOPERTE #33).
+- **Effetti visivi**: esplosioni con i **fotogrammi originali** (foglio dell'entry 2, `assets/fx/explosion.png`, fusione additiva, sprite rivolti alla camera) e scia di piccoli
+  sbuffi dietro i missili. Prova: `godot --path engines/godot res://scenes/flight_demo.tscn -- --fx` (un'esplosione 260 m davanti all'aereo al fotogramma 12).
+- Nota di test: a 150 m/s e 10 fotogrammi/s l'aereo percorre 15 m per fotogramma, quindi gli effetti vicini si attraversano in un attimo nelle catture.
+- Limiti: sfondo non perfettamente nero degli sprite (leggero riquadro chiaro), esplosioni a una sola dimensione, nessuna voce radio, nessun suono nella vista dal vivo oltre a motore e musica.

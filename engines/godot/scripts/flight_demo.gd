@@ -3,7 +3,7 @@ extends Node3D
 ## SEMPLIFICAZIONI (da migliorare): i nemici non sparano, comportamento minimo (aerei in cerchio, terrestri fermi), scala e
 ## velocita' scelte a mano, nessuna manovra T7/T8, obiettivo = distruggere tutti i nemici (squadra != 0).
 ## Comandi: freccia su/giu = beccheggio, sinistra/destra = rollio+virata, A/D = imbardata, W/S = motore, Spazio = missile,
-## R = ricomincia, H = aiuto, Esc = esci. Dati: res://assets/fighters_honor/ (mission.json, terreno.*, unita_*.gltf).
+## +/- = distanza della camera, R = ricomincia, Esc = esci. Dati: res://assets/fighters_honor/ (mission.json, terreno.*, unita_*.gltf).
 
 const DIR := "res://assets/fighters_honor/"
 const WS := 0.02                 # metri per unita' di mondo (ipotesi)
@@ -30,25 +30,45 @@ var _ammo := 12
 var _won := false
 var _start := Vector3.ZERO
 var _fire_cd := 0.0
+const AUDIO := "res://assets/audio/"
+var _music := AudioStreamPlayer.new()      # musica: tracce originali XA decodificate (SCOPERTE #33), N = traccia successiva
+var _eng := AudioStreamPlayer.new()        # motore: SEGNAPOSTO sintetico
+var _sfx_pl: Dictionary = {}
+var _tracks: Array = []
+var _ti := 0
+var _lock_cd := 0.0
+var _cockpit := false
+var _envr: Environment
+var _sun := DirectionalLight3D.new()
+var _q := 1                  # qualita': 0 bassa, 1 media (predefinita), 2 alta - tasto G
+var _hud2: Control
+var _cz := 1.0              # zoom della camera di inseguimento: tasti + e -
 var _test := false
+var _fxtest := false
 var _frame := 0
 
 func _ready() -> void:
 	_test = OS.get_cmdline_user_args().has("--autotest")
+	_cockpit = OS.get_cmdline_user_args().has("--cockpit")
+	_fxtest = OS.get_cmdline_user_args().has("--fx")   # prova degli effetti: un'esplosione davanti all'aereo al fotogramma 12
 	var env := WorldEnvironment.new(); env.environment = Environment.new()
 	var sky := Sky.new(); var pm := ProceduralSkyMaterial.new()
-	pm.sky_top_color = Color(0.18, 0.38, 0.75); pm.sky_horizon_color = Color(0.72, 0.80, 0.90)
+	pm.sky_top_color = Color(0.06, 0.22, 0.60); pm.sky_horizon_color = Color(0.50, 0.66, 0.86)
 	pm.ground_horizon_color = Color(0.55, 0.62, 0.66); pm.ground_bottom_color = Color(0.20, 0.30, 0.38)
 	sky.sky_material = pm
 	env.environment.background_mode = Environment.BG_SKY; env.environment.sky = sky
 	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.environment.ambient_light_energy = 0.55
 	env.environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.environment.fog_enabled = true; env.environment.fog_density = 0.00015
-	env.environment.fog_light_color = Color(0.72, 0.80, 0.90)
+	env.environment.fog_light_color = Color(0.50, 0.64, 0.84)
+	env.environment.adjustment_enabled = true   # grading: piu' contrasto e colore (lo schermo era troppo bianco)
+	env.environment.adjustment_contrast = 1.14; env.environment.adjustment_saturation = 1.22; env.environment.adjustment_brightness = 0.95
+	_envr = env.environment
 	add_child(env)
-	var sun := DirectionalLight3D.new(); sun.rotation_degrees = Vector3(-45, 35, 0); sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 600.0
-	add_child(sun)
+	_sun.rotation_degrees = Vector3(-45, 35, 0); _sun.light_energy = 1.25; _sun.shadow_enabled = true
+	_sun.directional_shadow_max_distance = 350.0; _sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	add_child(_sun)
 	_load_terrain()
 	var d: Dictionary = JSON.parse_string(FileAccess.open(DIR + "mission.json", FileAccess.READ).get_as_text())
 	var pp: Array = d["giocatore"]["pos"]
@@ -65,8 +85,61 @@ func _ready() -> void:
 	var layer := CanvasLayer.new(); add_child(layer)
 	_hud.position = Vector2(14, 10); _hud.add_theme_font_size_override("font_size", 18); layer.add_child(_hud)
 	_msg.position = Vector2(330, 220); _msg.add_theme_font_size_override("font_size", 36); layer.add_child(_msg)
-	var ch := Label.new(); ch.text = "+"; ch.position = Vector2(474, 252); ch.add_theme_font_size_override("font_size", 28); layer.add_child(ch)
+	_hud2 = (load("res://scripts/hud.gd") as GDScript).new(); layer.add_child(_hud2)
+	_setup_audio()
+	_apply_quality()
 	_reset()
+
+## Profili di qualita' (tasto G): 0 bassa = niente SSAO/glow/ombre/MSAA; 1 media = glow + ombre vicine + FXAA; 2 alta = anche SSAO e MSAA 2x
+func _apply_quality() -> void:
+	var vp := get_viewport()
+	_envr.ssao_enabled = (_q >= 2)
+	_envr.glow_enabled = (_q >= 1)
+	_sun.shadow_enabled = (_q >= 1)
+	vp.msaa_3d = Viewport.MSAA_2X if _q >= 2 else Viewport.MSAA_DISABLED
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if _q == 1 else Viewport.SCREEN_SPACE_AA_DISABLED
+
+## WAV a 44 byte (come li scrive il modulo wave di Python): canali a +22, frequenza a +24, PCM 16 bit
+func _wav(path: String, loop: bool) -> AudioStreamWAV:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return null
+	var b := f.get_buffer(f.get_length())
+	var st := AudioStreamWAV.new()
+	st.format = AudioStreamWAV.FORMAT_16_BITS
+	st.stereo = b.decode_u16(22) == 2
+	st.mix_rate = b.decode_u32(24)
+	st.data = b.slice(44)
+	if loop:
+		st.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		st.loop_begin = 0
+		st.loop_end = st.data.size() / (4 if st.stereo else 2)
+	return st
+
+func _setup_audio() -> void:
+	add_child(_music); add_child(_eng)
+	_music.volume_db = -7.0
+	_eng.stream = _wav(AUDIO + "sfx_motore.wav", true); _eng.volume_db = -10.0
+	if _eng.stream != null:
+		_eng.play()
+	for n in ["lancio", "esplosione", "aggancio"]:
+		var p := AudioStreamPlayer.new(); p.stream = _wav(AUDIO + "sfx_%s.wav" % n, false); add_child(p); _sfx_pl[n] = p
+	for fn in DirAccess.get_files_at(AUDIO):
+		if fn.begins_with("traccia_") and fn.ends_with(".wav"):
+			_tracks.append(fn)
+	_tracks.sort()
+	if _tracks.size() > 0:
+		_play_track(0)
+
+func _play_track(i: int) -> void:
+	_ti = posmod(i, _tracks.size())
+	var s := _wav(AUDIO + _tracks[_ti], true)
+	if s != null:
+		_music.stream = s; _music.play()
+
+func _sfx(n: String) -> void:
+	if _sfx_pl.has(n) and (_sfx_pl[n] as AudioStreamPlayer).stream != null:
+		(_sfx_pl[n] as AudioStreamPlayer).play()
 
 func _w2g(p: Array) -> Vector3:
 	return Vector3(p[0] * WS, -p[1] * WS, p[2] * WS)
@@ -100,6 +173,15 @@ func _load_terrain() -> void:
 	mi.material_override = m; mi.visible = false; add_child(mi)   # solo collisione: il terreno disegnato e' la mesh originale HD
 	var real := _load_model(DIR + "terreno_mesh_hd.gltf")
 	if real != null:
+		for tmi in real.find_children("*", "MeshInstance3D", true, false):
+			var tm := tmi as MeshInstance3D
+			tm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			for s in range(tm.mesh.get_surface_count()):
+				var sm := tm.mesh.surface_get_material(s)
+				if sm is StandardMaterial3D:
+					var d := (sm as StandardMaterial3D).duplicate() as StandardMaterial3D
+					d.metallic = 0.0; d.roughness = 1.0; d.metallic_specular = 0.1; d.vertex_color_use_as_albedo = false
+					tm.set_surface_override_material(s, d)
 		add_child(real)
 	else:
 		mi.visible = true
@@ -175,6 +257,12 @@ func _reset() -> void:
 func _process(dt: float) -> void:
 	_frame += 1
 	_fire_cd = maxf(_fire_cd - dt, 0.0)
+	_eng.pitch_scale = 0.7 + _throttle * 0.45 + _speed / 700.0
+	_lock_cd -= dt
+	if _lock_cd <= 0.0 and not _won and not _target().is_empty():
+		_sfx("aggancio"); _lock_cd = 0.45
+	if _fxtest and _frame == 12:
+		_boom(_player.position + -_player.basis.z * 260.0 + Vector3(0, 6, 0), 1.6)
 	_fly(dt); _update_units(dt); _update_missiles(dt); _update_fx(dt); _update_cam(dt); _update_hud()
 	if _test and _frame == 90:
 		print("AUTOTEST pos=", _player.position, " speed=", _speed, " nemici=", _enemies_left()); get_tree().quit()
@@ -239,10 +327,15 @@ func _target() -> Dictionary:
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo:
 		if e.keycode == KEY_SPACE and _ammo > 0 and _fire_cd <= 0.0 and not _won:
-			_ammo -= 1; _fire_cd = 0.35
+			_ammo -= 1; _fire_cd = 0.35; _sfx("lancio")
 			_missiles.append({"p": _player.position + -_player.basis.z * 6.0, "v": -_player.basis.z * (_speed + 350.0),
 				"t": _target(), "life": 7.0, "node": _make_missile()})
 		if e.keycode == KEY_R: _reset()
+		if e.keycode == KEY_C: _cockpit = not _cockpit
+		if e.keycode == KEY_G: _q = (_q + 1) % 3; _apply_quality()
+		if e.keycode == KEY_N and _tracks.size() > 0: _play_track(_ti + 1)
+		if e.keycode == KEY_MINUS or e.keycode == KEY_KP_SUBTRACT: _cz = minf(_cz * 1.15, 4.0)   # camera piu' lontana
+		if e.keycode == KEY_EQUAL or e.keycode == KEY_KP_ADD: _cz = maxf(_cz / 1.15, 0.4)       # camera piu' vicina
 		if e.keycode == KEY_ESCAPE: get_tree().quit()
 
 func _make_missile() -> Node3D:
@@ -260,6 +353,9 @@ func _update_missiles(dt: float) -> void:
 			ms["v"] = (ms["v"] as Vector3).lerp(want, clampf(dt * 2.5, 0, 1))
 		ms["p"] = (ms["p"] as Vector3) + (ms["v"] as Vector3) * dt
 		var node: Node3D = ms["node"]; node.position = ms["p"]
+		ms["pt"] = float(ms.get("pt", 0.0)) - dt                      # scia: puffi piccoli (riga 3 del foglio) ogni 0,03 s
+		if ms["pt"] <= 0.0:
+			_fx_quad(ms["p"], 7.0, 3, 2, 0.5, true); ms["pt"] = 0.03
 		if (ms["v"] as Vector3).length() > 1.0:
 			node.basis = Basis.looking_at((ms["v"] as Vector3).normalized(), Vector3.UP) * Basis(Vector3.RIGHT, PI / 2)
 		var hit := false
@@ -276,28 +372,83 @@ func _kill(u: Dictionary) -> void:
 	if _enemies_left() == 0:
 		_won = true; _msg.text = "MISSIONE COMPIUTA"
 
+## Esplosioni: fotogrammi originali (entry 2, foglio 256 px, 4 colonne x 3 righe utili), fusione additiva, sempre rivolte alla camera
+var _fx_tex: Texture2D
+func _fx_texture() -> Texture2D:
+	if _fx_tex == null:
+		var img := Image.load_from_file(ProjectSettings.globalize_path("res://assets/fx/explosion.png"))
+		if img != null:
+			_fx_tex = ImageTexture.create_from_image(img)
+	return _fx_tex
+
+func _fx_quad(p: Vector3, size: float, row0: int, frames: int, life: float, fade: bool) -> void:
+	var tex := _fx_texture()
+	if tex == null:
+		push_warning("fx: texture esplosione non caricata (assets/fx/explosion.png)")
+		return
+	var m := MeshInstance3D.new(); var q := QuadMesh.new(); q.size = Vector2(size, size); m.mesh = q
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED; mat.cull_mode = BaseMaterial3D.CULL_DISABLED; mat.albedo_texture = tex
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST; mat.no_depth_test = false
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA   # senza, la fusione additiva viene ignorata
+	mat.uv1_scale = Vector3(0.25, 56.0 / 224.0, 1.0)
+	m.material_override = mat; m.position = p; m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF; add_child(m)
+	_fx.append({"n": m, "t": 0.0, "mat": mat, "row0": row0, "frames": frames, "life": life, "fade": fade})
+
 func _boom(p: Vector3, s: float) -> void:
-	var m := MeshInstance3D.new(); var sp := SphereMesh.new(); sp.radius = 4.0 * s; sp.height = 8.0 * s; m.mesh = sp
-	var mat := StandardMaterial3D.new(); mat.albedo_color = Color(1, 0.55, 0.15); mat.emission_enabled = true; mat.emission = Color(1, 0.5, 0.1)
-	mat.emission_energy_multiplier = 3.0; mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.material_override = mat; m.position = p; add_child(m); _fx.append({"n": m, "t": 0.0})
+	_sfx("esplosione")
+	_fx_quad(p, 38.0 * s, 0, 12, 0.9, false)
 
 func _update_fx(dt: float) -> void:
 	for i in range(_fx.size() - 1, -1, -1):
 		var f: Dictionary = _fx[i]; f["t"] = float(f["t"]) + dt
-		var k := float(f["t"]); (f["n"] as Node3D).scale = Vector3.ONE * (1.0 + k * 5.0)
-		if k > 0.7:
-			(f["n"] as Node3D).queue_free(); _fx.remove_at(i)
+		var k := float(f["t"]) / float(f["life"])
+		if k >= 1.0:
+			(f["n"] as Node3D).queue_free(); _fx.remove_at(i); continue
+		var fr := int(k * int(f["frames"])); var idx := int(f["row0"]) * 4 + fr
+		var mat: StandardMaterial3D = f["mat"]
+		mat.uv1_offset = Vector3((idx % 4) * 0.25, (idx / 4) * (56.0 / 224.0), 0.0)
+		if f["fade"]:
+			var c := 1.0 - k; mat.albedo_color = Color(c, c, c)
+
+func _hud_data(fwd_sign: float, spd: float) -> Dictionary:
+	var b := _player.basis
+	var f := b.z * fwd_sign * -1.0 if fwd_sign < 0 else b.z
+	var fwd := -b.z if fwd_sign < 0 else b.z               # direzione "avanti" dell'aereo
+	var blips: Array = []
+	var tgt: Dictionary = _target() if fwd_sign < 0 else {}
+	for u in _units:
+		if u["alive"] and u["enemy"]:
+			var rel: Vector3 = (u["node"] as Node3D).position - _player.position
+			var loc := b.inverse() * rel
+			blips.append([loc.x * (1.0 if fwd_sign < 0 else -1.0), (-loc.z) if fwd_sign < 0 else loc.z])
+	var td := {}
+	if not tgt.is_empty():
+		var tp: Vector3 = (tgt["node"] as Node3D).position
+		if not _cam.is_position_behind(tp):
+			td = {"screen": _cam.unproject_position(tp), "dist": (tp - _player.position).length() / WS * WS}
+	return {"speed": spd * 3.6, "alt": _player.position.y - ground_m(_player.position), "thr": clampf(_throttle / 1.4, 0, 1),
+		"ammo": _ammo, "enemies": _enemies_left(), "pitch": asin(clampf(fwd.y, -1, 1)), "roll": atan2(b.x.y, b.y.y) * (1.0 if fwd_sign < 0 else -1.0),
+		"heading": rad_to_deg(atan2(fwd.x, fwd.z)), "blips": blips, "radar_range": 4000.0, "target": td, "cockpit": _cockpit, "damage": 0}
 
 func _update_cam(dt: float) -> void:
+	if _cockpit:
+		_player.visible = false
+		_cam.fov = 78.0
+		_cam.position = _player.position + _player.basis * Vector3(0, 0.9, -2.4)
+		_cam.basis = _player.basis
+		return
+	_player.visible = true
 	var k := clampf(_speed / 210.0, 0.0, 1.0)                        # distanza e campo visivo crescono con la velocita'
 	_cam.fov = lerpf(62.0, 74.0, k)
-	var want := _player.position + _player.basis * Vector3(0, lerpf(1.6, 2.4, k), lerpf(4.5, 8.0, k))
-	_cam.position = _cam.position.lerp(want, clampf(dt * 6.0, 0, 1))
-	_cam.look_at(_player.position + _player.basis * Vector3(0, 0.8, -10.0), _player.basis.y)
+	var want := _player.position + _player.basis * Vector3(0, lerpf(1.6, 2.2, k) * _cz, lerpf(5.2, 7.0, k) * _cz)
+	_cam.position = want   # nessun ritardo sulla posizione: con il lerp la camera restava indietro di velocita/6 metri
+	_cam.look_at(_player.position + _player.basis * Vector3(0, 0.6, -8.0), _player.basis.y)
 
 func _update_hud() -> void:
+	_hud2.d = _hud_data(-1.0, _speed); _hud2.queue_redraw()
 	var alt := _player.position.y - ground_m(_player.position)
 	var t := _target()
-	_hud.text = "VEL %d km/h   QUOTA %d m   MOTORE %d%%   MISSILI %d   NEMICI %d%s\nSu/Giu beccheggio  Sx/Dx virata  A/D imbardata  W/S motore  Spazio missile  R ricomincia" % [
-		int(_speed * 3.6), int(alt), int(_throttle * 100.0 / 1.4 * 1.0), _ammo, _enemies_left(), ("   [BERSAGLIO IN MIRA]" if not t.is_empty() else "")]
+	_hud.text = "FPS %d  qualita' %s (G)   Su/Giu beccheggio  Sx/Dx virata  A/D imbardata  W/S motore  Spazio missile  C camera  +/- distanza  N musica (%s)  R ricomincia" % [Engine.get_frames_per_second(), ["bassa", "media", "alta"][_q], (_tracks[_ti].get_basename() if _tracks.size() > 0 else "nessuna")]
+	_hud.position = Vector2(14, 70); _hud.add_theme_font_size_override("font_size", 14); _hud.modulate = Color(1, 1, 1, 0.6)

@@ -208,7 +208,13 @@ python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor    # ~4 s, 2,3 
 #   models/unita_NN.gltf (13 unità texturizzate), parte2_tabelle.json (9 tabelle decodificate), mappa_t2.png, manifest.json
 ```
 
-Audio (XA → WAV, `xa_audio.py`): testato solo su fixture sintetica, **non ancora sul disco reale**.
+**Audio** (✅ disco reale, 2026-11-14; SCOPERTE #33):
+```sh
+python3 -I pipeline/ac2_audio.py list "$D"                                       # 7 canali XA stereo 37,8 kHz, ~15 min ciascuno
+python3 -I pipeline/ac2_audio.py tracks "$D" out/iso/ACE2.STH out/audio          # 64 tracce STH → out/audio/traccia_NN_chC.wav (~27 s, 112 MB)
+python3 -I pipeline/ac2_audio.py extract "$D" 1 0 out/audio/canale0.wav 30       # un canale, al massimo 30 s
+python3 -I pipeline/ac2_sfx_placeholder.py                                       # effetti SEGNAPOSTO (i suoni originali non sono ancora estratti)
+```
 
 Per aprire un modello: in Godot importa il `.gltf` (le PNG devono stare accanto); le texture hanno
 trasparenza (colore 0x0000) e campionamento "nearest" è consigliato.

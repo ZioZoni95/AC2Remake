@@ -12,6 +12,7 @@ var _last_frame := -1
 var _prev_pos := Vector3.ZERO
 var _vel := 0.0
 var _roll_sign := -1.0
+var _cz2 := 1.0
 
 func _ready() -> void:
 	super._ready()
@@ -30,6 +31,12 @@ func _pose(buf: PackedByteArray, base: int) -> Array:
 	var ya := f.cross(xa)
 	var b := Basis(xa, ya, f).rotated(f, _roll_sign * roll)
 	return [g, b]
+
+func _unhandled_input(e: InputEvent) -> void:
+	super._unhandled_input(e)
+	if e is InputEventKey and e.pressed and not e.echo:
+		if e.keycode == KEY_MINUS or e.keycode == KEY_KP_SUBTRACT: _cz2 = minf(_cz2 * 1.15, 4.0)
+		if e.keycode == KEY_EQUAL or e.keycode == KEY_KP_ADD: _cz2 = maxf(_cz2 / 1.15, 0.4)
 
 func _process(dt: float) -> void:
 	if not FileAccess.file_exists(STATE):
@@ -62,10 +69,16 @@ func _process(dt: float) -> void:
 			node.position = q[0]
 			node.basis = (q[1] as Basis).scaled(Vector3.ONE * MODEL_SCALE)
 	var fwd := (pl[1] as Basis).z
-	var k := clampf(_vel / 210.0, 0.0, 1.0)                           # distanza e campo visivo crescono con la velocita'
-	_cam.fov = lerpf(62.0, 74.0, k)
-	var want := newp - fwd * lerpf(4.5, 8.0, k) + Vector3.UP * lerpf(1.6, 2.4, k)
-	_cam.position = _cam.position.lerp(want, clampf(dt * 8.0, 0, 1))
-	_cam.look_at(newp + fwd * 10.0, Vector3.UP)
-	_hud.text = "ORIGINALE dal vivo  frame %d   VEL %d km/h   QUOTA %d m   pos (%d, %d, %d)\nIl gioco gira nell'emulatore: pilota li (WASD/Z/C/X). Esc esce." % [
-		frame, int(_vel * 3.6), int(newp.y), int(newp.x / WS), int(-newp.y / WS), int(newp.z / WS)]
+	if _cockpit:
+		_player.visible = false
+		_cam.fov = 78.0
+		_cam.position = newp + fwd * 2.4 + Vector3.UP * 0.9
+		_cam.basis = (pl[1] as Basis) * Basis(Vector3.UP, PI)
+	else:
+		_player.visible = true
+		var k := clampf(_vel / 210.0, 0.0, 1.0)                           # distanza e campo visivo crescono con la velocita'
+		_cam.fov = lerpf(62.0, 74.0, k)
+		_cam.position = newp - fwd * lerpf(5.2, 7.0, k) * _cz2 + Vector3.UP * lerpf(1.6, 2.2, k) * _cz2
+		_cam.look_at(newp + fwd * 8.0, Vector3.UP)
+	_hud2.d = _hud_data(1.0, _vel); _hud2.queue_redraw()
+	_hud.text = "ORIGINALE dal vivo (frame %d)   C camera   +/- distanza   Si pilota nell'emulatore" % frame

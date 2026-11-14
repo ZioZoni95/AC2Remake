@@ -92,7 +92,18 @@ def build_mesh(d, out, half=262144):
             o = T.tiles[t]; nxt = min([x for x in srt if x > o] + [len(P)])
             cache[t] = parse_tile(P, o, nxt)
         return cache[t]
+    DROP = 3000                      # profondita' delle gonne (unita' di mondo)
+    def edge(t, side):
+        """Vertici del bordo (LOD vicino) di una tessera: lista (coordinata lungo il bordo, indice vertice, y locale)."""
+        lv = tile(t)[0]
+        if side == "E": sel = [(lz, i, ly) for i, (lx, ly, lz) in enumerate(lv) if lx == 1024]
+        elif side == "W": sel = [(lz, i, ly) for i, (lx, ly, lz) in enumerate(lv) if lx == -1024]
+        elif side == "N": sel = [(lx, i, ly) for i, (lx, ly, lz) in enumerate(lv) if lz == 1024]
+        else: sel = [(lx, i, ly) for i, (lx, ly, lz) in enumerate(lv) if lz == -1024]
+        return sorted(sel)
+    OPP = {"E": "W", "W": "E", "N": "S", "S": "N"}
     verts, faces = [], []
+    n_skirt = 0
     lo = (-half + 524288) // TILE; hi = (half + 524288) // TILE
     for v in range(256):
         for u in range(lo, hi):
@@ -104,12 +115,28 @@ def build_mesh(d, out, half=262144):
             b0 = len(verts)
             for (lx, ly, lz) in lv:
                 verts.append((xc + 2 * lx, 2 * ly, zc + 2 * lz))
+            vmap = {}
             for idx, col, uvs, clut, tpage in prims:
                 faces.append((tuple(b0 + i for i in idx), [col] * len(idx), uvs, clut, tpage))
+                for j, vi in enumerate(idx): vmap.setdefault(vi, (uvs[j], clut, tpage, col))
+            # gonne: dove la quota del bordo non coincide con quella della tessera vicina (altrimenti si vede il cielo)
+            for side, du, dv in (("E", 1, 0), ("W", -1, 0), ("N", 0, -1), ("S", 0, 1)):
+                nu, nv_ = u + du, v + dv
+                if not (0 <= nu < 256 and 0 <= nv_ < 256): continue
+                mine = edge(t, side); theirs = edge(T.map[nv_ * 256 + nu], OPP[side])
+                if [(c, ly) for c, _i, ly in mine] == [(c, ly) for c, _i, ly in theirs]: continue
+                for (c1, i1, y1), (c2, i2, y2) in zip(mine, mine[1:]):
+                    if i1 not in vmap or i2 not in vmap: continue
+                    (uv1, cl, tp, col), (uv2, _c, _t, _k) = vmap[i1], vmap[i2]
+                    k = len(verts)
+                    verts.append((verts[b0 + i1][0], verts[b0 + i1][1] + DROP, verts[b0 + i1][2]))
+                    verts.append((verts[b0 + i2][0], verts[b0 + i2][1] + DROP, verts[b0 + i2][2]))
+                    faces.append(((b0 + i1, b0 + i2, k, k + 1), [col] * 4, [uv1, uv2, uv1, uv2], cl, tp))
+                    n_skirt += 1
     m = {"verts": verts, "faces": faces}
     os.makedirs(out, exist_ok=True)
     g = acemodel.to_gltf_vram(m, vram, os.path.join(out, "terreno_mesh"), scale=0.02, smooth=True)   # normali morbide per la luce
-    print(f"mesh terreno: {len(verts)} vertici, {len(faces)} poligoni, {len(set((f[4], f[3]) for f in faces))} texture -> {g}")
+    print(f"mesh terreno: {len(verts)} vertici, {len(faces)} poligoni ({n_skirt} segmenti di gonna), {len(set((f[4], f[3]) for f in faces))} texture -> {g}")
 
 
 def main(d, out, step=1024, half=524288):
