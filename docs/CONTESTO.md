@@ -17,15 +17,16 @@ estratti dal disco originale per uso personale e dati di missione ricostruiti da
 
 ## Il problema aperto (dove ripartire)
 Fighter's Honor è l'ultima missione; Free Mission si sblocca solo finendo il gioco. Strade:
-1. **Menu di debug del gioco**: `ROOT MENU` con GAME/BRIEFING/TITLE/FONT, struttura a `0x800ad2e0`,
-   codice a `0x80067324` (funzione `0x8006685c`, nessun chiamante diretto: viene da un dispatcher).
-   Non si sa ancora come si attiva né se è raggiungibile nella versione PAL.
+1. **Menu di debug del gioco** — ✅ **raggiunto** (SCOPERTE #12): forzando `[0x800b8a60] |= 0x400000` a ogni
+   vblank (sonda `pipeline/lua/ac2_debug_menu_probe.lua`, `FORCE=true`) compare il `ROOT MENU` a schermo.
+   **Prossimo**: navigarlo (GAME/BRIEFING/TITLE/FONT), vedere se GAME permette di scegliere lo stadio e
+   avviare Fighter's Honor (id stadio 32?, da verificare); capire quale tasto lo apre senza forzatura.
 2. **Blocco di avanzamento del salvataggio**: 860 byte + checksum a somma di byte, copia viva a
    `[0x801de228] + 0x8b4`. Riempirlo (missioni completate, aerei, punti, flag Free Mission) con
    `emu.write_*`, oppure generare una memory card `.mcd` con checksum corretto.
 3. Trovare la variabile di modalità/stadio osservando i breakpoint e forzarla con `emu.write_*`.
-Passo successivo previsto: sonda Lua con breakpoint su `0x8006685c` e `0x80067324` mentre si naviga
-fino al titolo/START; in parallelo Ghidra sui due binari (`docs/GUIDA.md` §4).
+Strumenti pronti: Ghidra 12.2 con i due binari importati in `out/ghidra/` (gp impostato; script in
+`pipeline/ghidra/`), sonda Lua del menu di debug.
 
 ## Ambiente: cosa serve su una macchina nuova
 | Cosa | Dove sta | Come si ottiene |
@@ -50,7 +51,7 @@ python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT out/models  # attesi:
 
 ## Stato degli strumenti sulla macchina di origine (2026-11-14)
 Godot 4.7.2 ✅, Unity Hub 4.0.0 ✅ (Editor non installato), binutils MIPS ✅, Java 21 ✅;
-Ghidra e JDK 25 **non** ancora installati; Unity su Ubuntu 26.04 non è nell'elenco ufficiale.
+Ghidra 12.2 e JDK 25 ✅ installati; Unity Editor in installazione; Unity su Ubuntu 26.04 non è nell'elenco ufficiale.
 
 ## Errori già fatti (da non ripetere)
 - Avviare l'emulatore senza `--game`. 
