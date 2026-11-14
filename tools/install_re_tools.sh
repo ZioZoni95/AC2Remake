@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Installa gli strumenti per il reverse-engineering statico di AC2Remake:
-#   - openjdk-21-jdk (richiesto da Ghidra), curl, unzip, binutils MIPS
+#   - openjdk-21-jdk e openjdk-25-jdk (le release recenti di Ghidra chiedono JDK 21 o 25: si installano
+#     entrambi, Ghidra sceglie quello compatibile), curl, unzip, binutils MIPS
 #   - Ghidra (ultima release da GitHub) in ~/Tools/ghidra
 # Uso:  ./tools/install_re_tools.sh        (chiede la password sudo per apt)
 set -euo pipefail
 
 sudo apt update
-sudo apt install -y openjdk-21-jdk curl unzip binutils-mipsel-linux-gnu
+sudo apt install -y openjdk-21-jdk openjdk-25-jdk curl unzip binutils-mipsel-linux-gnu
 
 DEST="$HOME/Tools"
 mkdir -p "$DEST"
@@ -27,5 +28,7 @@ rm -rf "$TMP"
 echo
 echo "Fatto."
 java -version 2>&1 | head -1
+echo "Requisito Java di questa release (dal pacchetto):"
+grep -rhiE "jdk|java" "$DEST/ghidra/docs/GettingStarted.md" 2>/dev/null | head -3 || true
 echo "Ghidra GUI:       $DEST/ghidra/ghidraRun"
 echo "Ghidra headless:  $DEST/ghidra/support/analyzeHeadless"

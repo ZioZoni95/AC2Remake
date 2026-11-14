@@ -32,6 +32,7 @@ run_emulator.sh  lancia ZoniStationOne (che resta nel suo repo) con X11 forzato
 
 | Documento | Contenuto |
 |---|---|
+| [docs/GUIDA.md](docs/GUIDA.md) | **come si usa tutto**: installazione, emulatore, estrazione, disassemblaggio (comandi verificati) |
 | [docs/PIPELINE.md](docs/PIPELINE.md) | strumenti, uso, e i formati CD/TIM/TMD/XA/ACE2 con specifiche psx-spx |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | fasi con gate verificabili, rischi e rimedi |
 | [docs/METODOLOGIA_RE.md](docs/METODOLOGIA_RE.md) | come si reverse-ingegnerizza la missione (dynamic-first) |
