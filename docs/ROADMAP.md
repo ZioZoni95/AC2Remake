@@ -59,3 +59,10 @@ Piano a fasi con gate espliciti. Ogni fase si chiude solo con una consegna verif
 | Dati missione compressi/criptati nel DAT | tracciare la decompressione in RAM via probe Lua |
 | Logica missione troppo incastrata nell'EXE | solo allora: Ghidra statica |
 | GLES/vr di Godot su GTX 1050 | si lavora a risoluzione nativa PSX-like, upscale opzionale |
+
+## Aggiornamento 2026-11-14 (fine sessione)
+- **Fase 2**: ✅ 24 aerei giocabili con texture (`ac2_aircraft.py`); ✅ blocco di Fighter's Honor con 49 texture e 13
+  unità texturizzate (`ac2_mission.py`); ✅ texture TIM verificate al 100% contro la VRAM del gioco. Restano: audio
+  dal disco reale, import in Godot (gate: un aereo + un nemico con le texture giuste).
+- **Fase 3**: ✅ **Fighter's Honor avviata dal titolo senza completare il gioco** (SCOPERTE #12–#18), ricetta salvata in
+  `pipeline/lua/ac2_start_fighters_honor.lua` e in GUIDA §2b. Restano: nemici/waypoint/trigger → `mission.json`.

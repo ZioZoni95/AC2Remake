@@ -183,3 +183,86 @@ def to_gltf(m, tim_bytes, outbase, scale=0.01):
     with open(outbase + ".gltf", "w") as f:
         json.dump(gl, f)
     return outbase + ".gltf"
+
+
+# ------------------------------------------------- glTF da una VRAM ricostruita (piu' TIM, piu' palette)
+def vram_new():
+    return [0] * (1024 * 512)
+
+
+def vram_apply_tim(vram, t):
+    """Scrive in `vram` (lista di 1024*512 u16) l'immagine e la CLUT di un TIM, alle coordinate del suo header."""
+    fl = struct.unpack_from("<I", t, 4)[0]
+    pos = 8
+    blocks = []
+    if fl & 8:
+        l, x, y, w, h = struct.unpack_from("<IhhHH", t, pos); blocks.append((x, y, w, h, pos + 12)); pos += l
+    l, x, y, w, h = struct.unpack_from("<IhhHH", t, pos); blocks.append((x, y, w, h, pos + 12))
+    for x, y, w, h, d in blocks:
+        for r in range(h):
+            for c in range(w):
+                if 0 <= x + c < 1024 and 0 <= y + r < 512 and d + (r * w + c) * 2 + 2 <= len(t):
+                    vram[(y + r) * 1024 + x + c] = struct.unpack_from("<H", t, d + (r * w + c) * 2)[0]
+    return blocks
+
+
+def vram_page_image(vram, tpage, clut):
+    """Immagine RGBA 256x256 della pagina `tpage` con la palette `clut` (modi 4 e 8 bit)."""
+    px, py = (tpage & 15) * 64, ((tpage >> 4) & 1) * 256
+    mode = (tpage >> 7) & 3
+    cx, cy = (clut & 0x3F) * 16, clut >> 6
+    pal = [vram[cy * 1024 + cx + i] if cx + i < 1024 else 0 for i in range(256 if mode == 1 else 16)]
+    out = bytearray()
+    for v in range(256):
+        for u in range(256):
+            if mode == 0:
+                wd = vram[(py + v) * 1024 + (px + u // 4) % 1024]; i = (wd >> (4 * (u % 4))) & 15
+            elif mode == 1:
+                wd = vram[(py + v) * 1024 + (px + u // 2) % 1024]; i = (wd >> (8 * (u % 2))) & 255
+            else:
+                wd = vram[(py + v) * 1024 + (px + u) % 1024]; i = -1
+            c = pal[i] if i >= 0 else wd
+            out += bytes(((c & 31) * 255 // 31, ((c >> 5) & 31) * 255 // 31, ((c >> 10) & 31) * 255 // 31, 0 if c == 0 else 255))
+    return bytes(out)
+
+
+def to_gltf_vram(m, vram, outbase, scale=0.01):
+    """Come to_gltf, ma le texture si campionano dalla VRAM: una immagine per coppia (tpage, clut) usata."""
+    groups = {}
+    for verts, cols, uvs, clut, tpage in m["faces"]:
+        g = groups.setdefault((tpage, clut), {"pos": [], "uv": [], "col": []})
+        for a, b, c in ([(0, 1, 2)] if len(verts) == 3 else [(0, 1, 2), (2, 1, 3)]):
+            for k in (a, c, b):
+                x, y, z = m["verts"][verts[k]]
+                g["pos"].append((x * scale, -y * scale, z * scale))
+                u, v = uvs[k]
+                g["uv"].append(((u + 0.5) / 256, (v + 0.5) / 256))
+                g["col"].append(tuple(min(255, c2 * 2) / 255 for c2 in cols[k]) + (1.0,))
+    buf = bytearray(); views = []; accs = []; prims = []; mats = []; texs = []; imgs = []
+    def push(data, count, ctype, mn=None, mx=None):
+        while len(buf) % 4: buf.append(0)
+        views.append({"buffer": 0, "byteOffset": len(buf), "byteLength": len(data), "target": 34962})
+        buf.extend(data)
+        a = {"bufferView": len(views) - 1, "componentType": 5126, "count": count, "type": ctype}
+        if mn: a["min"], a["max"] = mn, mx
+        accs.append(a); return len(accs) - 1
+    for n, ((tp, cl), g) in enumerate(sorted(groups.items())):
+        png = f"{outbase}_t{tp:02x}_c{cl:04x}.png"
+        _png_rgba(png, 256, 256, vram_page_image(vram, tp, cl))
+        imgs.append({"uri": os.path.basename(png)}); texs.append({"source": len(imgs) - 1, "sampler": 0})
+        mats.append({"name": f"tp{tp:02x}_cl{cl:04x}", "doubleSided": True, "alphaMode": "MASK", "alphaCutoff": 0.5,
+                     "pbrMetallicRoughness": {"baseColorTexture": {"index": len(texs) - 1}, "metallicFactor": 0.0, "roughnessFactor": 1.0}})
+        P = g["pos"]
+        pa = push(b"".join(struct.pack("<3f", *p) for p in P), len(P), "VEC3",
+                  [min(p[i] for p in P) for i in range(3)], [max(p[i] for p in P) for i in range(3)])
+        ua = push(b"".join(struct.pack("<2f", *u) for u in g["uv"]), len(P), "VEC2")
+        ca = push(b"".join(struct.pack("<4f", *c) for c in g["col"]), len(P), "VEC4")
+        prims.append({"attributes": {"POSITION": pa, "TEXCOORD_0": ua, "COLOR_0": ca}, "material": n})
+    gl = {"asset": {"version": "2.0", "generator": "AC2Remake acemodel/vram"}, "scene": 0, "scenes": [{"nodes": [0]}],
+          "nodes": [{"mesh": 0}], "meshes": [{"primitives": prims}], "materials": mats, "textures": texs, "images": imgs,
+          "samplers": [{"magFilter": 9728, "minFilter": 9728, "wrapS": 33071, "wrapT": 33071}],
+          "accessors": accs, "bufferViews": views,
+          "buffers": [{"byteLength": len(buf), "uri": "data:application/octet-stream;base64," + base64.b64encode(bytes(buf)).decode()}]}
+    with open(outbase + ".gltf", "w") as f:
+        json.dump(gl, f)
+    return outbase + ".gltf"

@@ -69,6 +69,37 @@ il meccanismo base è ✅): avvia con `ZS1_LUA_SCRIPT=…/pipeline/lua/ac2_remot
 
 ---
 
+## 2b. Avviare Fighter's Honor senza completare il gioco (✅ verificato il 2026-11-14)
+
+Cosa è stato fatto davvero (SCOPERTE #12–#18), nell'ordine:
+1. Emulatore avviato **col disco** e con la sonda remota `pipeline/lua/ac2_remote.lua` (forza l'apertura del
+   ROOT MENU e legge i comandi da `/tmp/ac2_cmd.lua`, ogni comando scritto in un file temporaneo e poi `mv`).
+2. Gioco portato al **titolo** (`START GAME / LOAD / OPTION`, modulo `[0x800b8184] == 2`): FMV saltate con `Space`
+   oppure caricando un savestate preso lì.
+3. Dal canale remoto, **questa sequenza esatta** (nessun click sul menu):
+```lua
+wr32(0x80010030, 32)      -- stadio: 0 Gambit ... 32 Fighter's Honor
+wr32(0x80010034, 0)       -- aereo del giocatore: 0..23
+wr32(0x800b83fc, 4)       -- modulo richiesto: GAME
+wr32(0x800b892c, 1)       -- richiesta di cambio modulo (come la voce GAME del menu)
+```
+4. Risultato osservato: il gioco carica le entry DAT **30** (aereo), **54** e **166** (missione 32), parte
+   Fighter's Honor, nessun errore CPU. Poi si può salvare uno stato (`F5`; attenzione: `F5`/`F8` usano lo slot
+   corrente, di default lo 0).
+
+**In un solo passo (⚠️ non ancora eseguito come script autonomo):**
+```sh
+cd ~/GitHub/ZonistationOne/run
+ZS1_LUA_SCRIPT=$HOME/GitHub/AC2Remake/pipeline/lua/ac2_start_fighters_honor.lua ZS1_LOG_STDERR=1 SDL_VIDEODRIVER=x11 \
+  ../ZoniStation_One ../roms/SCPH-7502.BIN --game="$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin"
+# premere Space per saltare le FMV: al titolo lo script richiede da solo il modulo GAME (riga "[FH] ..." nel log)
+```
+Per un'altra missione basta cambiare `STAGE` (0–32, nomi in SCOPERTE #15) e `PLANE` (0–23) nello script.
+Cose da non fare: scrivere `[S+1]`/`[S+2]` del selettore (`0x80010c14`) con valori ≥ 8 (crash della CPU emulata);
+cliccare sulle righe del ROOT MENU due volte di fila (colpisce righe diverse).
+
+---
+
 ## 3. Estrarre gli asset dal disco
 
 Tutto in `out/` (non versionato). Bastano tre comandi, nell'ordine:
@@ -93,6 +124,22 @@ python3 pipeline/ace2arc.py list STH out/iso/ACE2.STH        # ✅ 68 entry di s
 python3 pipeline/tim2png.py FILE.tim out.png                  # TIM singolo
 python3 pipeline/acemodel.py out/iso/ACE2.DAT 179 1 out.obj   # ✅ un solo modello → OBJ (senza texture)
 python3 pipeline/tests/test_pipeline.py                       # ✅ 18/18
+```
+
+**Aerei giocabili** (✅ 24/24, ~secondi; richiede `out/overlay0.bin`, vedi §4):
+
+```sh
+python3 -I pipeline/ac2_aircraft.py list                       # id, nome, entry DAT (30+id)
+python3 -I pipeline/ac2_aircraft.py export XFA-27 out/aerei    # un aereo (glTF+PNG+OBJ)
+python3 -I pipeline/ac2_aircraft.py all out/aerei              # tutti e 24
+```
+
+**Una missione intera** (✅ stadio 32 = Fighter's Honor; 0 = Gambit; buchi 13/17/19):
+
+```sh
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor    # ~4 s, 2,3 MB
+# → partNN.bin (11 parti grezze), tex/*.png (49 TIM), vram.png (VRAM ricostruita),
+#   models/unita_NN.gltf (13 unità texturizzate), manifest.json
 ```
 
 Audio (XA → WAV, `xa_audio.py`): testato solo su fixture sintetica, **non ancora sul disco reale**.
@@ -159,10 +206,11 @@ Dove guardare (già scoperto, vedi `docs/SCOPERTE.md`):
 
 ## 6. Cosa manca (a oggi)
 
-- **Avviare davvero Fighter's Honor** dal menu di debug (GAME, modulo 4) con lo stadio giusto: il menu è pilotato
-  da Lua ma nessuna missione è ancora partita; capire il significato di modulo 5 / stage 29 (SCOPERTE #14).
-- Riverificare `ac2_remote.lua` (ultima versione, click con breakpoint) alla prossima sessione.
-- Identificare l'aereo del giocatore e i nemici tra i 146 modelli; verificare la variante `sub3`.
-- Audio dal disco reale; `mission/mission.json` (spawn, waypoint, trigger).
-- Import in Godot (gate della Fase 2) e, poi, il confronto con Unity.
-- Idea non decisa: pannello "AC2" nel debug workspace dell'emulatore (vedi CONTESTO.md).
+- **Decodificare i dati di missione** dell'entry 166: nemici (istanze con tipo e posizione), waypoint, trigger. Candidate
+  le parti 0, 2, 3, 4 e le tabelle comuni 5/7; in RAM il pool di 63 oggetti da 372 B (SCOPERTE #21).
+- `mission/mission.json` e il terreno (parte 0, ipotesi) in un formato leggibile da Godot.
+- Audio dal disco reale (XA→WAV è stato provato solo su dati sintetici).
+- Import in Godot di un aereo e di un'unità (gate della Fase 2); poi il confronto con Unity (Hub ed Editor installati).
+- Eseguire una volta `ac2_start_fighters_honor.lua` come script autonomo (finora la sequenza è stata verificata a mano).
+- Livree/varianti degli aerei; LOD bassi dei modelli (altri codici primitiva).
+- Idea non decisa: pannello "AC2" nel debug workspace dell'emulatore.

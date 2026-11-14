@@ -31,6 +31,8 @@ marchi sono di Namco/Sony.
 ```sh
 python3 pipeline/tests/test_pipeline.py     # 18/18
 python3 -I pipeline/ac2_extract.py iso|tims|models ...   # estrazione (vedi docs/GUIDA.md)
+python3 -I pipeline/ac2_aircraft.py all out/aerei        # 24 aerei con texture
+python3 -I pipeline/ac2_mission.py extract 32 out/fh     # Fighter's Honor (stadio 32)
 ./run_emulator.sh "Ace Combat 2 (Europe).bin"
 ```
 
@@ -38,5 +40,6 @@ python3 -I pipeline/ac2_extract.py iso|tims|models ...   # estrazione (vedi docs
 
 - Disco, BIOS (`roms/SCPH-7502.BIN`) e `out/` **non sono nel repo**: vanno copiati/rigenerati (CONTESTO.md).
 - Le entry di `ACE2.DAT` sono container annidati; i modelli NON sono TMD (formato in PIPELINE.md / SCOPERTE #8).
-- Gli indirizzi chiave del codice sono in `docs/GUIDA.md` §4 e in SCOPERTE (#10, #11).
+- Gli indirizzi chiave del codice sono in `docs/GUIDA.md` §4 e in SCOPERTE (#10–#23). Fighter's Honor si avvia dal titolo
+  scrivendo `[0x80010030]=32`, `[0x80010034]=0`, `[0x800b83fc]=4`, `[0x800b892c]=1` (GUIDA §2b).
 - Il Python va lanciato con `-I` quando legge dati del disco (regola di sicurezza dell'ambiente).

@@ -15,24 +15,29 @@ estratti dal disco originale per uso personale e dati di missione ricostruiti da
 | 3 Reverse missione | ▶️ missione scelta; **bloccati** sul come raggiungerla senza completare il gioco |
 | 4–6 Slice Godot, Unity, chiusura | ⬜ |
 
-## Il problema aperto (dove ripartire) — stato al 2026-11-14, sessione interrotta
-Fighter's Honor è l'ultima missione; Free Mission si sblocca solo finendo il gioco. **Abbiamo trovato il
-menu di debug del gioco e lo pilotiamo da Lua** (SCOPERTE #12–#14). Stato esatto:
-- Il `ROOT MENU` compare forzando `[0x800b8a60] |= 0x400000` a ogni vblank (dopo che l'overlay è in RAM).
-- È a **cursore**: si clicca iniettando Y + `894c=0` + bit `0x200000` dentro un breakpoint a `0x80066ab0`.
-- Voci: FONT, TITLE, BRIEFING, GAME (+2 giapponesi). GAME dovrebbe essere azione 7 → modulo 4.
-- Ultimo esperimento: un click sfasato di una riga ha dato modulo 5 / stage 29; **non sappiamo cosa sia**.
-- **Non** abbiamo ancora avviato nessuna missione.
+## Stato al 2026-11-14 (fine sessione)
+**Fatto e verificato:**
+- Fighter's Honor **si avvia dal titolo** scrivendo `[0x80010030]=32`, `[0x80010034]=0`, `[0x800b83fc]=4`,
+  `[0x800b892c]=1` (SCOPERTE #18; GUIDA §2b; script `pipeline/lua/ac2_start_fighters_honor.lua`, ⚠️ non ancora
+  rieseguito come script autonomo; `start_stage()` in `ac2_remote.lua` idem). Niente savestate di forzatura.
+- **Aerei**: i 24 giocabili (nomi, id 0–23, entry `30 + id`) estratti con texture: `ac2_aircraft.py` (SCOPERTE #22).
+- **Missione**: blocco dati di Fighter's Honor (entry 166; 165/167 = varianti) estratto: 11 parti grezze, 49 TIM,
+  13 unità texturizzate, VRAM ricostruita (`ac2_mission.py`, SCOPERTE #19, #20, #23). Texture TIM = VRAM del gioco al 100%.
+- In RAM a missione in corso: tabella tipi unità, pool di 63 oggetti da 372 B, struttura del giocatore (SCOPERTE #20, #21).
+- Strumenti: Godot 4.7.2, Unity Hub 4.0.0 + Editor 6000.6.9f1, Ghidra 12.2 (headless) + JDK 25, binutils MIPS.
 
 **Prossimi passi, in ordine:**
-1. Cliccare la riga giusta per GAME (azione 7, probabilmente `click(4)` per via dello sfasamento +1: verificare
-   con `menu_info()` e a schermo) e vedere cosa parte.
-2. Scoprire la variabile dello stadio da cui GAME legge (candidata `[0x800b8b00]`, stampata come `STAGE%d`),
-   scriverla con `wr32` PRIMA del click; provare lo stadio di Fighter's Honor (indice 32 nella tabella titoli,
-   ma l'indice dello stadio potrebbe essere 1-based o diverso: verificare col briefing a schermo).
-3. Se lo stadio parte con salvataggio vuoto (niente aerei/punti), valutare di riempire il blocco di
-   avanzamento (SCOPERTE #11) per avere l'aereo giusto; per i dati di missione non serve.
-4. Con la missione in corso: log delle letture DAT, watchpoint su nemici/waypoint/trigger → `mission.json`.
+1. **Decodificare i dati di missione** (nemici, waypoint, trigger) dalle parti 0, 2, 3, 4 dell'entry 166 e dalle tabelle comuni
+   5/7, aiutandosi con la RAM a missione in corso: pool a `[0x800b8748]` (63 slot × 0x174, coordinate a 32 bit con 11 bit
+   frazionari alle parole 9–11 dello slot), tipo → modello con la tabella tipi (`[0x800b84fc]`). Confrontare con Gambit
+   (entry 79) per separare dati comuni e specifici. Risultato atteso: `mission/mission.json`.
+2. **Godot**: importare un aereo (es. XFA-27) e un'unità nemica con le texture (gate della Fase 2).
+3. Audio dal disco reale (XA→WAV) e musica/voci della missione.
+4. Valutare aereo preferito (`+0x34`) e avanzamento (`+0x8b4`) per il gioco "completo"; poi il confronto con Unity.
+
+**Idea in sospeso (non decisa):** pannello "AC2" nel debug workspace dell'emulatore (ImGui, su un branch dedicato, merge a
+cura dell'utente) per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug workspace ha già una *Lua
+Console* con esecuzione di codice e di file.
 
 **Come riprendere (passi esatti):**
 ```sh
@@ -41,7 +46,8 @@ ZS1_LUA_SCRIPT=$HOME/GitHub/AC2Remake/pipeline/lua/ac2_remote.lua ZS1_LOG_STDERR
   ../ZoniStation_One ../roms/SCPH-7502.BIN --game="$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin" \
   2>&1 | tee /tmp/remote.log
 # nella finestra: Space per saltare le FMV fino al titolo; dopo ~50-60 s compare ROOT MENU in alto a sinistra
-echo 'menu_info()' > /tmp/ac2_cmd.lua     # il risultato appare nel log con prefisso [R]
+# comandi: scrivi in un file TEMPORANEO e poi mv (atomico: se la sonda legge il file mentre lo scrivi lo perde)
+echo 'menu_info()' > /tmp/ac2_cmd.tmp && mv /tmp/ac2_cmd.tmp /tmp/ac2_cmd.lua   # risultato nel log, prefisso [R]
 ```
 Attenzioni: se il gioco entra in **modalità demo** sul titolo i valori cambiano (è già successo); non usare
 `pkill -f "ZoniStation_One ..."` (uccide anche la shell che lo contiene: usare il PID); `ac2_remote.lua` dopo
@@ -74,8 +80,8 @@ python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT out/models  # attesi:
 ```
 
 ## Stato degli strumenti sulla macchina di origine (2026-11-14)
-Godot 4.7.2 ✅, Unity Hub 4.0.0 ✅ (Editor non installato), binutils MIPS ✅, Java 21 ✅;
-Ghidra 12.2 e JDK 25 ✅; Unity Editor in installazione (non verificato che sia finita); Unity su Ubuntu 26.04 non è nell'elenco ufficiale.
+Godot 4.7.2 ✅, Unity Hub 4.0.0 ✅ + Editor 6000.6.9f1 ✅, binutils MIPS ✅, Java 21+25 ✅;
+Ghidra 12.2 e JDK 25 ✅; Unity Editor 6000.6.9f1 installato ✅ (mai avviato: su Ubuntu 26.04 non è nell'elenco ufficiale di Unity).
 
 ## Errori già fatti (da non ripetere)
 - Avviare l'emulatore senza `--game`. 

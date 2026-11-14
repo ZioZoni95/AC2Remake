@@ -7,6 +7,8 @@ local CMD_FILE = "/tmp/ac2_cmd.lua"
 local FLAG, CURY, SEL, STATE_PTR, NITEMS, ACTIONS = 0x800b8a60, 0x800b8b94, 0x800b89b4, 0x800b8330, 0x800b83a8, 0x800b90b8
 local FORCE_OPEN = true
 local frame, loaded = 0, false
+CDLOG = true            -- log delle letture dal disco: LBA e offset nel DAT (DAT parte a LBA 74, STP a 47887)
+local last_lba = -1000
 
 local function log(fmt, ...) emu.log("[R] " .. string.format(fmt, ...)) end
 rd32 = emu.read_u32; rd8 = emu.read_u8
@@ -58,8 +60,28 @@ emu.on_break(function(reason)
   emu.resume()
 end)
 
+-- Avvia direttamente una missione dal titolo (SCOPERTE #18, VERIFICATO con stadio 32 = Fighter's Honor):
+-- scrive lo stadio e l'aereo nello stato globale e richiede il modulo GAME (=4), come farebbe la voce GAME.
+-- stage 0..32 (0 = Gambit, 32 = Fighter's Honor), plane 0..23. Va chiamata dal titolo, MENU di debug aperto.
+function start_stage(stage, plane)
+  wr32(0x80010030, stage); wr32(0x80010034, plane or 0)
+  wr32(0x800b83fc, 4); wr32(0x800b892c, 1)
+  log("start_stage(%d, %d): modulo 4 richiesto", stage, plane or 0)
+end
+
 emu.on_event(function(ev)
   frame = frame + 1
+  if CDLOG then
+    local cd = emu.cd_state()
+    if cd.drive_state == 3 then
+      local lba = cd.current_lba
+      if math.abs(lba - last_lba) > 40 then
+        last_lba = lba
+        if lba < 47886 then log("[CD] lba=%d DAT off=0x%x", lba, (lba - 74) * 2048)
+        else log("[CD] lba=%d STP off=0x%x", lba, (lba - 47887) * 2048) end
+      end
+    end
+  end
   if not loaded and rd32(0x80018000) == 0x544e4f43 and rd32(STATE_PTR) ~= 0 then
     loaded = true; log("overlay in RAM al frame %d", frame)
   end

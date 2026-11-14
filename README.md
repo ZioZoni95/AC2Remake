@@ -13,8 +13,8 @@ Il repo è privato e contiene solo codice, script e documentazione: **nessun ass
 |---|---|
 | 0. Fondamenta (pipeline, riferimenti, emulatore) | ✅ |
 | 1. Mappatura disco e archivio ACE2 | ✅ |
-| 2. Asset | ▶️ 2.876 TIM e 146 modelli glTF texturizzati estratti; mancano audio dal disco reale, aereo del giocatore/nemici, import in Godot |
-| 3. Reverse della missione → `mission/mission.json` | ▶️ **trovato e pilotato da Lua il menu di debug del gioco**; da fare: avviare Fighter's Honor da lì |
+| 2. Asset | ▶️ 24 aerei giocabili e il blocco di Fighter's Honor (49 texture, 13 unità) estratti con texture; mancano audio e import in Godot |
+| 3. Reverse della missione → `mission/mission.json` | ▶️ **Fighter's Honor si avvia dal titolo** (ricetta verificata); da fare: nemici, waypoint, trigger |
 | 4. Slice giocabile in Godot 4 | ⬜ |
 | 5. Confronto con Unity | ⬜ |
 
@@ -39,6 +39,8 @@ D="$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin"
 python3 -I pipeline/ac2_extract.py iso    "$D"               out/iso      # DAT, STH, EXE
 python3 -I pipeline/ac2_extract.py tims   out/iso/ACE2.DAT   out/tim     # 2.876 PNG
 python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT   out/models  # 146 glTF, ~15 s
+python3 -I pipeline/ac2_aircraft.py export XFA-27 out/aerei               # un aereo giocabile (o `all`)
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor          # blocco di Fighter's Honor
 ./run_emulator.sh "Ace Combat 2 (Europe).bin"                            # il gioco
 ```
 

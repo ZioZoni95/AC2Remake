@@ -12,6 +12,8 @@ utilizzabili da qualunque motore (Godot 4, Unity). Nessuna dipendenza esterna: s
 | `tim2png.py` | immagini TIM (4/8/16/24 bpp, CLUT BGR555) → PNG | ✅ fixture 16bpp+4bpp; ~2.876 TIM reali |
 | `tmd2gltf.py` | modelli TMD standard → OBJ + glTF 2.0. **I modelli di AC2 non sono TMD**: usare `acemodel.py` | ✅ fixture |
 | `ace2arc.py` | directory dell'archivio ACE2.DAT / ACE2.STH→STP, estrazione per indice, sniff TIM/TMD | ✅ fixture |
+| `ac2_aircraft.py` | i 24 aerei giocabili per nome o id (`list`, `export XFA-27 OUT`, `all OUT`): glTF texturizzato + OBJ | ✅ 24/24 |
+| `ac2_mission.py` | blocco dati di una missione (`extract STADIO OUT`): parti grezze, TIM→PNG, VRAM ricostruita, modelli delle unità texturizzati, manifest | ✅ stadio 32 |
 | `ac2_extract.py` | estrazione in blocco dal disco: `iso`, `tims` (2.876 PNG), `models` (146 glTF texturizzati) | ✅ disco reale |
 | `mipsdis.py` | mini disassemblatore MIPS R3000 (stdlib) per sbirciare overlay ed EXE | ✅ |
 | `acemodel.py` | modelli AC2 (non TMD): vertici + GT3/GT4 → OBJ; formato in SCOPERTE #8 | ✅ fixture + 146 geometrie reali |
