@@ -182,6 +182,16 @@ def main():
     check("acemodel: 4 vertici, 1 GT3, 1 GT4",
           len(m["verts"]) == 4 and len(m["tris"]) == 1 and len(m["quads"]) == 1)
 
+    # acemodel.to_gltf: 1 triangolo texturizzato su TIM 4bpp (CLUT riga y=0, palette 0)
+    mm = {"verts": [(0, 0, 0), (100, 0, 0), (0, 100, 0)],
+          "faces": [((0, 1, 2), [(128, 128, 128)] * 3, [(0, 0), (3, 0), (0, 1)], 0x0000, 0x0000)]}
+    gl = acemodel.to_gltf(mm, t4, os.path.join(out, "acetest"))
+    import json
+    gj = json.load(open(gl))
+    check("acemodel: glTF 1 mesh, 1 materiale, PNG palette scritto",
+          len(gj["meshes"][0]["primitives"]) == 1 and len(gj["materials"]) == 1
+          and os.path.exists(os.path.join(out, "acetest_p0.png")))
+
     tmd_data = open(psxcd.extract_file(disc, dict(files)["MODEL.TMD"], out), "rb").read()
     objs = tmd2gltf.parse(tmd_data)
     check("tmd: 1 oggetto", len(objs) == 1)

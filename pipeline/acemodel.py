@@ -20,18 +20,19 @@ def split(blob):
     return [blob[offs[i]:offs[i + 1]] for i in range(n)]
 
 
-def _prims(g, o):
+def _prims(g, o, FACES=None):
+    FACES = [] if FACES is None else FACES
     tris, quads = [], []
     while o + 28 <= len(g):
         code = g[o + 7]
         if code == 0x34 and g[o + 3] == 0:
             i = tuple(g[o:o + 3]); col = [tuple(g[o + 4 + 4 * k:o + 7 + 4 * k]) for k in range(3)]
             uv = [(g[o + 16], g[o + 17]), (g[o + 20], g[o + 21]), (g[o + 24], g[o + 25])]
-            tris.append((i, col, uv)); o += 28
+            tris.append((i, col, uv)); FACES.append((i, col, uv, struct.unpack_from("<H", g, o + 18)[0], struct.unpack_from("<H", g, o + 22)[0])); o += 28
         elif code == 0x3C and o + 36 <= len(g):
             i = tuple(g[o:o + 4]); col = [tuple(g[o + 4 + 4 * k:o + 7 + 4 * k]) for k in range(4)]
             uv = [(g[o + 20], g[o + 21]), (g[o + 24], g[o + 25]), (g[o + 28], g[o + 29]), (g[o + 32], g[o + 33])]
-            quads.append((i, col, uv)); o += 36
+            quads.append((i, col, uv)); FACES.append((i, col, uv, struct.unpack_from("<H", g, o + 22)[0], struct.unpack_from("<H", g, o + 26)[0])); o += 36
         else:
             break
     return tris, quads, len(g) - o
@@ -45,11 +46,12 @@ def parse_geometry(g):
         raise ValueError("offset primitive non valido")
     nv = (prim_off - 8) // 8
     verts = [struct.unpack_from("<3h", g, 8 + 8 * i) for i in range(nv)]
-    tris, quads, tail = _prims(g, prim_off)
+    faces = []
+    tris, quads, tail = _prims(g, prim_off, faces)
     mx = max([max(t[0]) for t in tris] + [max(q[0]) for q in quads] + [0])
     if tail != 0 or mx >= nv:
         raise ValueError(f"geometria incoerente (tail={tail}, maxidx={mx}, nv={nv})")
-    return {"verts": verts, "tris": tris, "quads": quads, "tail": 0}
+    return {"verts": verts, "tris": tris, "quads": quads, "faces": faces, "tail": 0}
 
 
 def to_obj(m, path):
@@ -75,3 +77,109 @@ if __name__ == "__main__":
     m = parse_geometry(split(parts[sub])[1])
     print(len(m["verts"]), "verts", len(m["tris"]), "GT3", len(m["quads"]), "GT4", "tail", m["tail"])
     to_obj(m, out)
+
+
+# ---------------------------------------------------------------- glTF texturizzato
+import base64, json, zlib
+
+
+def _png_rgba(path, w, h, rgba):
+    def chunk(t, d):
+        c = struct.pack(">I", len(d)) + t + d
+        return c + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+    raw = b"".join(b"\x00" + bytes(rgba[y * w * 4:(y + 1) * w * 4]) for y in range(h))
+    with open(path, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+                + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
+
+
+def parse_tim4(t):
+    """TIM 4bpp con CLUT -> dict(clut_xy, clut[], rect(x,y,w_px,h), idx[] indici palette per pixel)."""
+    fl = struct.unpack_from("<I", t, 4)[0]
+    if fl & 7 != 0 or not fl & 8:
+        raise ValueError("serve TIM 4bpp con CLUT")
+    pos = 8
+    blen, cx, cy, cw, ch = struct.unpack_from("<IhhHH", t, pos)
+    clut = [struct.unpack_from("<H", t, pos + 12 + 2 * i)[0] for i in range((blen - 12) // 2)]
+    pos += blen
+    blen, ix, iy, iw, ih = struct.unpack_from("<IhhHH", t, pos)
+    body = t[pos + 12:pos + blen]
+    w = iw * 4
+    idx = bytearray(w * ih)
+    for y in range(ih):
+        for x in range(w):
+            b = body[y * iw * 2 + x // 2]
+            idx[y * w + x] = (b >> ((x % 2) * 4)) & 15
+    return {"clut_xy": (cx, cy), "clut": clut, "rect": (ix * 4, iy, w, ih), "idx": idx}
+
+
+def palette_image(tim, pal):
+    """RGBA per la palette `pal` (indice nella riga CLUT, 16 colori ciascuna); colore 0x0000 = trasparente."""
+    x0, y0, w, h = tim["rect"]
+    cols = tim["clut"][pal * 16:pal * 16 + 16]
+    px = bytearray()
+    for i in tim["idx"]:
+        c = cols[i] if i < len(cols) else 0
+        px += bytes(((c & 31) * 255 // 31, ((c >> 5) & 31) * 255 // 31, ((c >> 10) & 31) * 255 // 31,
+                     0 if c == 0 else 255))
+    return w, h, px
+
+
+def to_gltf(m, tim_bytes, outbase, scale=0.01):
+    """Scrive outbase.gltf (+ outbase_pN.png, una per palette usata). Facce non indicizzate
+    (UV e colore per faccia); y invertita (PSX y verso il basso) con winding corretto."""
+    tim = parse_tim4(tim_bytes)
+    x0, y0, tw, th = tim["rect"]                   # px VRAM (x in px 4bpp)
+    # primitiva = (pal) -> liste
+    groups = {}
+    def clut_pal(clut):  # clut = x/16 + y*64 ; x in 16-px unita'
+        cx = (clut & 0x3F) * 16; cy = clut >> 6
+        if cy != tim["clut_xy"][1]:
+            raise ValueError("CLUT su altra riga: non gestito")
+        return (cx - tim["clut_xy"][0]) // 16
+    def add(face):
+        verts, cols, uvs, clut, tpage = face
+        pal = clut_pal(clut); px, py = (tpage & 15) * 64 * 4, ((tpage >> 4) & 1) * 256
+        g = groups.setdefault(pal, {"pos": [], "uv": [], "col": []})
+        tris = [(0, 1, 2)] if len(verts) == 3 else [(0, 1, 2), (2, 1, 3)]
+        for a, b, c in tris:
+            for k in (a, c, b):                    # y flip -> winding invertito
+                x, y, z = m["verts"][verts[k]]
+                g["pos"].append((x * scale, -y * scale, z * scale))
+                u, v = uvs[k]
+                g["uv"].append(((px + u - x0 + 0.5) / tw, (py + v - y0 + 0.5) / th))
+                g["col"].append(tuple(min(255, c2 * 2) / 255 for c2 in cols[k]) + (1.0,))
+    # UV/clut/tpage: rileggiamo dal blob dato che _prims non li espone -> usiamo m["raw"]
+    for i, col, uv, clut, tpage in m["faces"]:
+        add((i, col, uv, clut, tpage))
+    buf = bytearray(); views = []; accs = []; prims = []; mats = []; texs = []; imgs = []
+    def push(data, target, count, ctype, mn=None, mx=None, ctypeid=5126):
+        while len(buf) % 4: buf.append(0)
+        views.append({"buffer": 0, "byteOffset": len(buf), "byteLength": len(data), "target": 34962})
+        buf.extend(data)
+        a = {"bufferView": len(views) - 1, "componentType": ctypeid, "count": count, "type": ctype}
+        if mn: a["min"], a["max"] = mn, mx
+        accs.append(a); return len(accs) - 1
+    for n, (pal, g) in enumerate(sorted(groups.items())):
+        w, h, rgba = palette_image(tim, pal)
+        png = f"{outbase}_p{pal}.png"; _png_rgba(png, w, h, rgba)
+        imgs.append({"uri": os.path.basename(png)}); texs.append({"source": len(imgs) - 1, "sampler": 0})
+        mats.append({"name": f"pal{pal}", "doubleSided": True, "alphaMode": "MASK", "alphaCutoff": 0.5,
+                     "pbrMetallicRoughness": {"baseColorTexture": {"index": len(texs) - 1},
+                                              "metallicFactor": 0.0, "roughnessFactor": 1.0}})
+        P = g["pos"]
+        pa = push(b"".join(struct.pack("<3f", *p) for p in P), 34962, len(P), "VEC3",
+                  [min(p[i] for p in P) for i in range(3)], [max(p[i] for p in P) for i in range(3)])
+        ua = push(b"".join(struct.pack("<2f", *u) for u in g["uv"]), 34962, len(P), "VEC2")
+        ca = push(b"".join(struct.pack("<4f", *c) for c in g["col"]), 34962, len(P), "VEC4")
+        prims.append({"attributes": {"POSITION": pa, "TEXCOORD_0": ua, "COLOR_0": ca}, "material": n})
+    gl = {"asset": {"version": "2.0", "generator": "AC2Remake acemodel"},
+          "scene": 0, "scenes": [{"nodes": [0]}], "nodes": [{"mesh": 0}],
+          "meshes": [{"primitives": prims}], "materials": mats, "textures": texs, "images": imgs,
+          "samplers": [{"magFilter": 9728, "minFilter": 9728, "wrapS": 33071, "wrapT": 33071}],
+          "accessors": accs, "bufferViews": views,
+          "buffers": [{"byteLength": len(buf), "uri": "data:application/octet-stream;base64," +
+                       base64.b64encode(bytes(buf)).decode()}]}
+    with open(outbase + ".gltf", "w") as f:
+        json.dump(gl, f)
+    return outbase + ".gltf"
