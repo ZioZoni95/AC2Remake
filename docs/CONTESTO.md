@@ -15,18 +15,42 @@ estratti dal disco originale per uso personale e dati di missione ricostruiti da
 | 3 Reverse missione | ▶️ missione scelta; **bloccati** sul come raggiungerla senza completare il gioco |
 | 4–6 Slice Godot, Unity, chiusura | ⬜ |
 
-## Il problema aperto (dove ripartire)
-Fighter's Honor è l'ultima missione; Free Mission si sblocca solo finendo il gioco. Strade:
-1. **Menu di debug del gioco** — ✅ **raggiunto** (SCOPERTE #12): forzando `[0x800b8a60] |= 0x400000` a ogni
-   vblank (sonda `pipeline/lua/ac2_debug_menu_probe.lua`, `FORCE=true`) compare il `ROOT MENU` a schermo.
-   **Prossimo**: navigarlo (GAME/BRIEFING/TITLE/FONT), vedere se GAME permette di scegliere lo stadio e
-   avviare Fighter's Honor (id stadio 32?, da verificare); capire quale tasto lo apre senza forzatura.
-2. **Blocco di avanzamento del salvataggio**: 860 byte + checksum a somma di byte, copia viva a
-   `[0x801de228] + 0x8b4`. Riempirlo (missioni completate, aerei, punti, flag Free Mission) con
-   `emu.write_*`, oppure generare una memory card `.mcd` con checksum corretto.
-3. Trovare la variabile di modalità/stadio osservando i breakpoint e forzarla con `emu.write_*`.
-Strumenti pronti: Ghidra 12.2 con i due binari importati in `out/ghidra/` (gp impostato; script in
-`pipeline/ghidra/`), sonda Lua del menu di debug.
+## Il problema aperto (dove ripartire) — stato al 2026-11-14, sessione interrotta
+Fighter's Honor è l'ultima missione; Free Mission si sblocca solo finendo il gioco. **Abbiamo trovato il
+menu di debug del gioco e lo pilotiamo da Lua** (SCOPERTE #12–#14). Stato esatto:
+- Il `ROOT MENU` compare forzando `[0x800b8a60] |= 0x400000` a ogni vblank (dopo che l'overlay è in RAM).
+- È a **cursore**: si clicca iniettando Y + `894c=0` + bit `0x200000` dentro un breakpoint a `0x80066ab0`.
+- Voci: FONT, TITLE, BRIEFING, GAME (+2 giapponesi). GAME dovrebbe essere azione 7 → modulo 4.
+- Ultimo esperimento: un click sfasato di una riga ha dato modulo 5 / stage 29; **non sappiamo cosa sia**.
+- **Non** abbiamo ancora avviato nessuna missione.
+
+**Prossimi passi, in ordine:**
+1. Cliccare la riga giusta per GAME (azione 7, probabilmente `click(4)` per via dello sfasamento +1: verificare
+   con `menu_info()` e a schermo) e vedere cosa parte.
+2. Scoprire la variabile dello stadio da cui GAME legge (candidata `[0x800b8b00]`, stampata come `STAGE%d`),
+   scriverla con `wr32` PRIMA del click; provare lo stadio di Fighter's Honor (indice 32 nella tabella titoli,
+   ma l'indice dello stadio potrebbe essere 1-based o diverso: verificare col briefing a schermo).
+3. Se lo stadio parte con salvataggio vuoto (niente aerei/punti), valutare di riempire il blocco di
+   avanzamento (SCOPERTE #11) per avere l'aereo giusto; per i dati di missione non serve.
+4. Con la missione in corso: log delle letture DAT, watchpoint su nemici/waypoint/trigger → `mission.json`.
+
+**Come riprendere (passi esatti):**
+```sh
+cd ~/GitHub/ZonistationOne/run
+ZS1_LUA_SCRIPT=$HOME/GitHub/AC2Remake/pipeline/lua/ac2_remote.lua ZS1_LOG_STDERR=1 SDL_VIDEODRIVER=x11 \
+  ../ZoniStation_One ../roms/SCPH-7502.BIN --game="$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin" \
+  2>&1 | tee /tmp/remote.log
+# nella finestra: Space per saltare le FMV fino al titolo; dopo ~50-60 s compare ROOT MENU in alto a sinistra
+echo 'menu_info()' > /tmp/ac2_cmd.lua     # il risultato appare nel log con prefisso [R]
+```
+Attenzioni: se il gioco entra in **modalità demo** sul titolo i valori cambiano (è già successo); non usare
+`pkill -f "ZoniStation_One ..."` (uccide anche la shell che lo contiene: usare il PID); `ac2_remote.lua` dopo
+l'ultima modifica (click con breakpoint) **non è stato rieseguito**; il savestate dell'utente è locale a quella
+macchina (non in git). Il `ROOT MENU` si vede in alto a sinistra con glifi sporchi: è normale.
+
+**Idea in sospeso (non decisa):** un pannello "AC2" nel debug workspace dell'emulatore (ImGui, sul branch
+`feature/lua-memory-write`) con pulsanti per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug
+workspace ha già una *Lua Console* con esecuzione di codice e di file. Rimandato a dopo la prima missione avviata.
 
 ## Ambiente: cosa serve su una macchina nuova
 | Cosa | Dove sta | Come si ottiene |
@@ -51,7 +75,7 @@ python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT out/models  # attesi:
 
 ## Stato degli strumenti sulla macchina di origine (2026-11-14)
 Godot 4.7.2 ✅, Unity Hub 4.0.0 ✅ (Editor non installato), binutils MIPS ✅, Java 21 ✅;
-Ghidra 12.2 e JDK 25 ✅ installati; Unity Editor in installazione; Unity su Ubuntu 26.04 non è nell'elenco ufficiale.
+Ghidra 12.2 e JDK 25 ✅; Unity Editor in installazione (non verificato che sia finita); Unity su Ubuntu 26.04 non è nell'elenco ufficiale.
 
 ## Errori già fatti (da non ripetere)
 - Avviare l'emulatore senza `--game`. 

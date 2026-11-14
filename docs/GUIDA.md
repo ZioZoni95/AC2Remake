@@ -61,6 +61,12 @@ parte da LBA 74 per `ACE2.DAT`; `ACE2.STP` (streaming/FMV) da 47887.
 
 Le memory card e i log vengono scritti in `ZonistationOne/run/` a ogni avvio.
 
+**Controllo remoto dell'emulatore in esecuzione** (⚠️ ultima versione di `ac2_remote.lua` non rieseguita;
+il meccanismo base è ✅): avvia con `ZS1_LUA_SCRIPT=…/pipeline/lua/ac2_remote.lua`, poi scrivi codice Lua in
+`/tmp/ac2_cmd.lua`: viene eseguito entro ~0,1 s e cancellato; l'output è nel log (righe `[R]`). Funzioni:
+`menu_info()`, `click(i)`, `peek(addr,n)`, `cstr(addr)`, `rd32/rd8/wr32`. Dentro i comandi usa `emu.log(...)`
+(la `log` locale della sonda non è visibile). Dettagli e indirizzi: SCOPERTE #12–#14.
+
 ---
 
 ## 3. Estrarre gli asset dal disco
