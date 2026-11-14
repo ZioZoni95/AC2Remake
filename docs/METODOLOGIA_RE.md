@@ -12,17 +12,22 @@ PS-X EXE).
 - **ZoniStationOne** (riferimento read-only, binary già compilato):
   debugger con breakpoint/watchpoint, disassembly live, savestate F5/F8, due shell (`` ` ``).
 - **Probe Lua** (`ZS1_LUA_SCRIPT=…`): superficie `emu.*` in `src/core/lua_debug.c` —
-  `pc`, `reg`, `read_u8/16/32`, `add_breakpoint`, `add_read_watch`, `add_write_watch`,
+  `pc`, `reg`, `read_u8/16/32`, **`write_u8/16/32`** (solo branch `feature/lua-memory-write`: RAM e scratchpad, salta il bus), `add_breakpoint`, `add_read_watch`, `add_write_watch`,
   `on_break`, `on_event`, `pause`/`resume`, `disasm`, `gte_data`, `vram16`, `save_state`/`load_state`.
 - **Probe esistenti** in `scripts/` dell'emulatore come modelli di stile (es. `savestate_roundtrip.lua`).
 - **Ghidra** (rimandabile): decompilazione statica dell'EXE; objdump MIPS per sbirciate.
 
 ## Workflow a fasi
 
-1. **Mappatura disco** — `psxcd list` → `ACE2.DAT/STH/STP` + EXE (canale 2 dentro DAT).
-2. **Mappatura archivio** — `ace2arc list`: conteggio per tipo (TIM/TMD sniffati), canali
-   dello streaming. Le tabelle missione sono presumibilmente blob DAT senza magic riconoscibile.
-3. **Gioco la missione con tracciamento** — savestate subito prima del load missione;
+0. **Avvio sempre col disco** — `./run_emulator.sh "Ace Combat 2 (Europe).bin"` (mai solo BIOS). Il gioco parte dal boot: per leggere il caricamento si osservano i log (`ZS1_LOG_STDERR=1`, `logs/CDROM.log`) e `emu.cd_state()` (`current_lba`, `drive_state`), senza savestate di forzatura (D10).
+1. **Mappatura disco** — `psxcd.list_all` → `ACE2.DAT/STH/STP` + EXE (il modulo non ha CLI).
+2. **Mappatura archivio** — `ace2arc list`: le entry DAT sono container annidati (`[N][offset…]`),
+   non file singoli; TIM e modelli stanno a livello 1–2 (SCOPERTE #3, #4, #8). Le tabelle missione
+   sono presumibilmente blob senza magic: testi di briefing in chiaro nelle entry 7 e 12 (#10).
+   Corrispondenza LBA ↔ entry DAT: `lba = 74 + offset_entry/2048` (DAT parte a LBA 74).
+3. **Raggiungere la missione con tracciamento** — osservare il caricamento (log CD ↔ entry DAT),
+   trovare la variabile stadio/flag di sblocco e forzarla con `emu.write_*` (D8, D10); il savestate
+   F5 serve solo come comodità dopo aver raggiunto la missione;
    watchpoint su letture del DAT in RAM (`add_read_watch`) per vedere quali entry/offset
    tocca il loader; log delle letture ↔ indici archivio.
 4. **Identificazione strutture** — con gli offset noti si dumpa la RAM (probe Lua) e si

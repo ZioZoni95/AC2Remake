@@ -11,20 +11,24 @@ Piano a fasi con gate espliciti. Ogni fase si chiude solo con una consegna verif
 - [x] Emulatore funzionante (ZoniStationOne, source read-only), launcher `run_emulator.sh`
 - [x] Documentazione: PIPELINE.md, METODOLOGIA_RE.md, DECISIONI.md, questa roadmap
 
-## Fase 1 — Mappatura disco e archivio
-- [ ] `psxcd list` sul disco reale → inventario ISO (EXE, ACE2.*, dimostrativi)
-- [ ] `ace2arc list` DAT + STH → mappa entries (tipi sniffati, canali)
-- [ ] Estrazione massiva sniffata in `out/` (NON versionata)
-- [ ] **Gate**: inventario scritto in `docs/SCOPERTE.md` con conteggi per tipo
+## Fase 1 — Mappatura disco e archivio ✅
+- [x] Inventario ISO del disco reale (5 file; via API `psxcd.list_all`, il modulo non ha CLI)
+- [x] `ace2arc list` DAT (226 entry) + STH (68 entry); le entry DAT sono container annidati
+- [x] Estrazione sniffata in `out/` (NON versionata): ~2.876 TIM → PNG, 146 geometrie di modello
+- [x] **Gate**: inventario scritto in `docs/SCOPERTE.md` (#1–#9) ✅ (resta aperta l'anomalia offset STH, #5)
 
-## Fase 2 — Asset
-- [ ] Calibrazione decoder TMD sui file reali (layout rate/flags)
-- [ ] Modelli: aereo giocatore + nemici della missione → glTF
-- [ ] Texture: TIM → PNG (paesaggio, HUD, interfacce)
+## Fase 2 — Asset ▶️
+- [x] ~~Calibrazione TMD~~ superata: i modelli AC2 NON sono TMD; formato proprio decodificato (`acemodel.py`, SCOPERTE #8)
+- [~] Modelli → glTF texturizzato: export pronto (SCOPERTE #9); da fare: identificare aereo giocatore e nemici della missione, verificare variante sub3 (TIM a 992,384)
+- [~] Texture: TIM → PNG fatto (decoder validato, bug 4bpp corretto); da classificare per uso (terreno/HUD/aerei)
 - [ ] Audio: XA → WAV (radio/annunci, musica missione), CDDA se presente
 - [ ] **Gate**: un aereo + un nemico renderizzati in Godot con le texture giuste
 
-## Fase 3 — Reverse-ing. missione (scelta dall'utente)
+## Fase 3 — Reverse-ing. missione ▶️ (scelta: **Fighter's Honor**, ultima missione secondo l'utente)
+- [x] Missione scelta e titoli/briefing localizzati nel DAT (SCOPERTE #10)
+- [x] `emu.write_u8/16/32` nell'emulatore (branch `feature/lua-memory-write`, commit 210d6c9) per forzare lo stato da una sonda
+- [ ] **Avvio diretto della missione senza savestate**: dal log del caricamento disco (letture LBA ↔ entry DAT) trovare variabile stadio/flag di sblocco, poi forzarla con `emu.write_*`
+- [ ] Verificare l'ordine reale (la tabella titoli la dà come 1ª, l'utente come ultima)
 - [ ] Savestate pre-load missione + watchpoint sul loader DAT
 - [ ] Identificazione tabelle spawn/waypoint/trigger in RAM
 - [ ] Decoder dedicato → `mission/mission.json`

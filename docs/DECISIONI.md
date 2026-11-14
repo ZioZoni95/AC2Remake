@@ -4,7 +4,7 @@ Registro delle scelte fatte, col perché. Ultima in fondo, mai cancellare.
 
 ## D1 — Repo separato dall'emulatore
 **Data**: 2026-11-14. **Scelta**: il remake vive in `~/GitHub/AC2Remake`, `ZonistationOne`
-è riferimemento in sola lettura (binario, BIOS, disco, psx-spx).
+è riferimento in sola lettura (binario, BIOS, disco, psx-spx); eccezione in D8.
 **Perché**: l'emulatore è il progetto dell'utente (branch master su cui lavora ad altro);
 mescolare remake e emulatore sporcherebbe entrambi.
 
@@ -37,3 +37,29 @@ i formati PSX sono semplici abbastanza da decodificarli a mano.
 **Scelta**: ogni decoder nasce con un test su fixture sintetica prima di toccare il disco.
 **Perché**: un bug di parsing sul disco vero è indistinguibile da un formato inatteso;
 sul sintetico i due casi si separano.
+
+## D8 — Modifiche all'emulatore solo su branch dedicato
+**Data**: 2026-11-14. **Scelta**: D1 resta la regola (emulatore = riferimento), con una eccezione
+autorizzata dall'utente: serve poter scrivere in RAM da Lua per avviare una missione specifica
+senza giocare tutto il gioco. Si fa su `feature/lua-memory-write` in `ZonistationOne`
+(`emu.write_u8/16/32`, solo RAM e scratchpad, BIOS rifiutato), mai su `master`, senza push.
+**Perché**: le sonde in sola lettura non bastano a forzare lo stadio; un branch separato
+non tocca il lavoro dell'utente su `master`.
+**Limite noto**: la scrittura salta il bus (niente watchpoint, I-cache non invalidata): solo dati.
+
+## D9 — Missione scelta: Fighter's Honor
+**Data**: 2026-11-14. **Scelta**: il remake riproduce *Fighter's Honor*, l'ultima missione
+secondo l'utente. **Perché**: scelta dell'utente. **Nota**: la tabella titoli nell'EXE la elenca
+per prima (SCOPERTE #10): l'ordine della tabella non coincide necessariamente con l'ordine di gioco;
+da verificare osservando il numero di stadio in emulazione.
+
+## D10 — Raggiungere la missione senza savestate di forzatura
+**Data**: 2026-11-14. **Scelta**: non partire da un savestate "preparato"; osservare i log del
+caricamento da disco (letture CD/LBA mappate sulle entry DAT) e ricavare come il gioco sceglie lo
+stadio, per poi avviarlo direttamente. Un savestate F5 resta ammesso solo come comodità *dopo* aver
+raggiunto la missione. **Perché**: indicazione dell'utente; capire la selezione stadio serve anche
+a rintracciare gli asset della missione.
+
+## D11 — L'emulatore si avvia sempre col disco
+**Scelta**: ogni prova parte con `--game=<AC2 .bin>`. **Perché**: una prova col solo BIOS non
+dice nulla sul remake (errore fatto e corretto il 2026-11-14).

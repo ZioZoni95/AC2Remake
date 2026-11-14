@@ -7,21 +7,21 @@ utilizzabili da qualunque motore (Godot 4, Unity). Nessuna dipendenza esterna: s
 
 | Strumento | Funzione | Test |
 |---|---|---|
-| `psxcd.py` | lettore CD raw 2352, filesystem ISO9660 (list/extract), classificazione settori mode1/mode2-form1/form2 | ✅ fixture |
+| `psxcd.py` | lettore CD raw 2352, filesystem ISO9660, classificazione settori mode1/mode2-form1/form2. **Solo libreria, nessuna CLI** (`list_all`, `extract_file`) | ✅ fixture + disco reale |
 | `xa_audio.py` | carving dei settori XA-audio per (file,canale) + decoder ADPCM → WAV | ✅ fixture |
-| `tim2png.py` | immagini TIM (4/8/16/24 bpp, CLUT BGR555) → PNG | ✅ fixture |
-| `tmd2gltf.py` | modelli TMD → OBJ + glTF 2.0 | ✅ fixture (calibrare layout su file reali) |
+| `tim2png.py` | immagini TIM (4/8/16/24 bpp, CLUT BGR555) → PNG | ✅ fixture 16bpp+4bpp; ~2.876 TIM reali |
+| `tmd2gltf.py` | modelli TMD standard → OBJ + glTF 2.0. **I modelli di AC2 non sono TMD**: usare `acemodel.py` | ✅ fixture |
 | `ace2arc.py` | directory dell'archivio ACE2.DAT / ACE2.STH→STP, estrazione per indice, sniff TIM/TMD | ✅ fixture |
 | `acemodel.py` | modelli AC2 (non TMD): vertici + GT3/GT4 → OBJ; formato in SCOPERTE #8 | ✅ fixture + 146 geometrie reali |
 | `pngout.py` | scrittore PNG RGB (stdlib zlib), usato da tim2png | — |
-| `tests/test_pipeline.py` | fixture sintetiche: immagine CD, TIM, TMD, XA, directory ACE2 | 15/15 |
+| `tests/test_pipeline.py` | fixture sintetiche: immagine CD, TIM 16/4bpp, TMD, XA, directory ACE2, geometria e glTF AC2 | 18/18 |
 
 ## Uso
 
 ```sh
-# tutto il contenuto del filesystem ISO del disco
-python3 pipeline/psxcd.py list "…/Ace Combat 2 (Europe).bin"
-python3 pipeline/psxcd.py extract DISCO out/iso
+# filesystem ISO del disco (il modulo è una libreria: si usa da Python)
+python3 -I -c "import sys; sys.path.insert(0,'pipeline'); import psxcd; d=psxcd.Disc(sys.argv[1]); [print(p,e.lba,e.size) for p,e in psxcd.list_all(d)]" "…/Ace Combat 2 (Europe).bin"
+# estrazione di un file: psxcd.extract_file(disc, entry, 'out/iso')
 
 # audio XA: scan di tutto il disco, un WAV per (file, canale)
 python3 -c "import psxcd, xa_audio; d=psxcd.Disc('DISCO'); print(xa_audio.carve(d))"
@@ -33,7 +33,9 @@ python3 pipeline/ace2arc.py list STH ACE2.STH
 
 # asset
 python3 pipeline/tim2png.py TIMFILE out.png
-python3 pipeline/tmd2gltf.py TMDFILE          # → .obj + .gltf accanto
+python3 pipeline/tmd2gltf.py TMDFILE          # TMD standard → .obj + .gltf accanto
+# modello AC2 (entry DAT, sotto-file N) → OBJ; glTF texturizzato: acemodel.to_gltf(m, tim_bytes, base)
+python3 pipeline/acemodel.py out/iso/ACE2.DAT 179 1 out/models/e179_1.obj
 
 # test
 python3 pipeline/tests/test_pipeline.py
@@ -83,6 +85,26 @@ directory: u32 unknown(1), u32 N, poi N × u64:
   bit 32-63 offset/800h
 ```
 I file **non hanno nomi**: si identificano per indice, canale e sniff del contenuto.
+
+### Container annidati di ACE2.DAT (SCOPERTE #3)
+Le entry del DAT (226) non sono file singoli: sono container `[N][offset × N]` oppure
+`[size_totale][N][offset × N]`, con offset relativi all'entry; i sotto-file possono essere a loro
+volta container. Un TIM è valido solo se `8 + blocco CLUT + blocco immagine` ≤ lunghezza del sotto-file
+(la scansione ricorsiva senza questo controllo produce migliaia di falsi positivi). Entry 0 e 1 sono
+`PS-X EXE` (codice/overlay), non container. Corrispondenza disco: `lba = 74 + offset_entry/2048`.
+
+### Modello 3D di AC2 (SCOPERTE #8, #9) — NON è TMD
+Sotto-file `[3][off×3]`: part0 = 64 B (ignoto), part1 = geometria, part2 = TIM 4bpp con CLUT.
+```
+geometria:  +0 u32 ?, +4 u16 ?, +6 u16 offset primitive
+            +8  vertici 8 B: s16 x, y, z, 0   (fino all'offset primitive; PSX: y verso il basso)
+            primitive, riconosciute dal byte-codice a +7:
+              0x34 GT3 28 B: i0 i1 i2 pad | 3×(r g b code) | u0 v0 clut | u1 v1 tpage | u2 v2 pad
+              0x3C GT4 36 B: i0 i1 i2 i3  | 4×(r g b code) | u0 v0 clut | u1 v1 tpage | u2 v2 pad | u3 v3 pad
+```
+Texture: la pagina (`tpage`: x=(t&15)·64 word, y=((t>>4)&1)·256) è la finestra VRAM in cui il TIM
+viene caricato; `clut` (x=(c&3F)·16, y=c>>6) sceglie una delle palette da 16 colori della riga CLUT.
+Colore 0x0000 = trasparente; colore vertice 128 = neutro. Validato su 146 geometrie reali.
 
 ## Regole operative
 

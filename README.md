@@ -9,9 +9,9 @@ due motori in competizione** (Godot 4 prima, Unity come valutazione).
 | Fase | Stato |
 |---|---|
 | 0. Fondamenta (pipeline, riferimenti, emulatore) | ✅ |
-| 1. Mappatura disco e archivio ACE2 | ▶️ prossima |
-| 2. Asset (modelli, texture, audio) | ⬜ |
-| 3. Reverse-ing. missione → `mission/mission.json` | ⬜ |
+| 1. Mappatura disco e archivio ACE2 | ✅ (inventario in SCOPERTE #1–#6) |
+| 2. Asset (modelli, texture, audio) | ▶️ in corso: TIM e modelli decodificati, glTF texturizzato; audio e import Godot da fare |
+| 3. Reverse-ing. missione → `mission/mission.json` | ▶️ avviata: missione scelta **Fighter's Honor**, serve il modo di avviarla direttamente |
 | 4. Slice Godot 4 giocabile | ⬜ |
 | 5. Valutazione Unity | ⬜ |
 
@@ -19,7 +19,8 @@ due motori in competizione** (Godot 4 prima, Unity come valutazione).
 
 ```
 pipeline/      strumenti Python (solo stdlib): CD raw + ISO9660, XA-ADPCM→WAV,
-               TIM→PNG, TMD→OBJ/glTF, archivio ACE2.DAT/STH/STP — testati 15/15
+               TIM→PNG, modelli AC2→OBJ/glTF texturizzato (`acemodel`), archivio ACE2.DAT/STH/STP —
+               testati 18/18
 mission/       la missione come DATI (waypoint, spawn, trigger), motore-agnostico
 assets/        glTF + PNG + WAV (estratti: MAI versionati, vedi .gitignore)
 engines/       engines/godot (prima), engines/unity (valutazione)
@@ -40,7 +41,7 @@ run_emulator.sh  lancia ZoniStationOne (che resta nel suo repo) con X11 forzato
 ## Comandi rapidi
 
 ```sh
-python3 pipeline/tests/test_pipeline.py            # test pipeline (15/15)
+python3 pipeline/tests/test_pipeline.py            # test pipeline (18/18)
 ./run_emulator.sh                                  # menu BIOS (SCPH-7502 EU)
 ./run_emulator.sh "Ace Combat 2 (Europe).bin"      # disco montato
 ```
@@ -52,5 +53,9 @@ python3 pipeline/tests/test_pipeline.py            # test pipeline (15/15)
    richiede asset rifatti originali.
 2. La logica di missione vive in `mission/` come dati leggibili da entrambi i motori.
 3. Ogni scoperta di reverse va in `docs/SCOPERTE.md` con prova riproducibile.
-4. L'emulatore (`~/GitHub/ZonistationOne`) è riferimento in sola lettura: il remake non lo
-   modifica; i probe Lua per il remake vivono in `pipeline/lua/`.
+4. L'emulatore (`~/GitHub/ZonistationOne`) è di norma riferimento in sola lettura. Eccezione
+   autorizzata dall'utente (2026-11-14, D8): modifiche mirate solo su un branch dedicato
+   (oggi `feature/lua-memory-write`, `emu.write_u8/16/32`), mai su `master`. I probe Lua per il
+   remake vivono in `pipeline/lua/`.
+5. L'emulatore si avvia **sempre col disco montato** (`./run_emulator.sh "Ace Combat 2 (Europe).bin"`),
+   mai solo col BIOS.
