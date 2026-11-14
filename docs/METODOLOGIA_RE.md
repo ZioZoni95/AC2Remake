@@ -12,7 +12,7 @@ PS-X EXE).
 - **ZoniStationOne** (riferimento read-only, binary già compilato):
   debugger con breakpoint/watchpoint, disassembly live, savestate F5/F8, due shell (`` ` ``).
 - **Probe Lua** (`ZS1_LUA_SCRIPT=…`): superficie `emu.*` in `src/core/lua_debug.c` —
-  `pc`, `reg`, `read_u8/16/32`, **`write_u8/16/32`** (solo branch `feature/lua-memory-write`: RAM e scratchpad, salta il bus), `add_breakpoint`, `add_read_watch`, `add_write_watch`,
+  `pc`, `reg`, `read_u8/16/32`, **`write_u8/16/32`** (dal commit `c59eb77`, in `master` dell'emulatore: RAM e scratchpad, salta il bus), `add_breakpoint`, `add_read_watch`, `add_write_watch`,
   `on_break`, `on_event`, `pause`/`resume`, `disasm`, `gte_data`, `vram16`, `save_state`/`load_state`.
 - **Probe esistenti** in `scripts/` dell'emulatore come modelli di stile (es. `savestate_roundtrip.lua`).
 - **Ghidra** (rimandabile): decompilazione statica dell'EXE; objdump MIPS per sbirciate.

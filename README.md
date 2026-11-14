@@ -25,7 +25,7 @@ Dettaglio, problema aperto e prossimi passi: [docs/CONTESTO.md](docs/CONTESTO.md
 Prerequisiti **non in git** (vanno messi a mano): il disco `Ace Combat 2 (Europe).bin` in
 `~/GitHub/ZonistationOne/games/` e il BIOS PAL `SCPH-7502.BIN` in `~/GitHub/ZonistationOne/roms/`.
 L'emulatore ([ZonistationOne](https://github.com/ZioZoni95/ZonistationOne)) sta in un repo separato; serve il
-**branch `feature/lua-memory-write`** (aggiunge `emu.write_u8/16/32`).
+**`master`** aggiornato (dal 2026-11-14, commit `c59eb77`, include `emu.write_u8/16/32`).
 
 ```sh
 git clone <questo repo> ~/GitHub/AC2Remake && cd ~/GitHub/AC2Remake
@@ -80,7 +80,7 @@ CLAUDE.md       contesto e regole per Claude Code su una macchina nuova
    (`out/`, `assets/`, `*.bin`, `*.mcd` sono ignorati). Prima di ogni push controlla `git ls-files`.
 2. La logica di missione vive in `mission/` come dati leggibili da entrambi i motori.
 3. Ogni scoperta di reverse va in `docs/SCOPERTE.md` con prova riproducibile; ogni scelta in `docs/DECISIONI.md`.
-4. L'emulatore è di norma riferimento in sola lettura; eccezione (D8): modifiche mirate **solo** sul branch
-   `feature/lua-memory-write`, mai su `master`.
+4. L'emulatore è di norma riferimento in sola lettura; se serve modificarlo (D8, D12) si lavora su un branch
+   dedicato e il merge in `master` lo fa l'utente. `emu.write_u8/16/32` è già in `master`.
 5. L'emulatore si avvia **sempre col disco** (mai solo col BIOS).
 6. Nei documenti ✅ = provato sul disco reale, ⚠️ = non ancora provato.

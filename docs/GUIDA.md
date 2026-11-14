@@ -8,7 +8,7 @@ Percorsi usati nella guida:
 | Nome | Percorso |
 |---|---|
 | Progetto | `~/GitHub/AC2Remake` |
-| Emulatore | `~/GitHub/ZonistationOne` (branch `feature/lua-memory-write`) |
+| Emulatore | `~/GitHub/ZonistationOne` (`master`, da `c59eb77` con `emu.write_*`) |
 | Disco | `~/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin` |
 | Output estratti | `AC2Remake/out/` (**mai versionati**, vedi regole in README) |
 
@@ -54,7 +54,7 @@ SDL_VIDEODRIVER=x11 ../ZoniStation_One ../roms/SCPH-7502.BIN \
 ```
 
 Funzioni Lua utili (`emu.*`): `read_u8/16/32`, **`write_u8/16/32`** (RAM e scratchpad; solo sul
-branch `feature/lua-memory-write`, salta il bus: scrivere dati, non codice), `reg(i)`,
+`master` dal commit `c59eb77`, salta il bus: scrivere dati, non codice), `reg(i)`,
 `add_breakpoint`, `add_read_watch`, `add_write_watch`, `on_break`, `on_event(fn,"vblank")`,
 `cd_state()` (`current_lba`, `drive_state`), `disasm(addr)`, `save_state/load_state`. Il disco
 parte da LBA 74 per `ACE2.DAT`; `ACE2.STP` (streaming/FMV) da 47887.
@@ -153,7 +153,7 @@ Dove guardare (già scoperto, vedi `docs/SCOPERTE.md`):
 
 1. Ogni scoperta in `docs/SCOPERTE.md` con prova riproducibile; ogni scelta in `docs/DECISIONI.md`.
 2. Nulla di estratto dal disco entra in git (`out/`, `assets/`, `*.bin` sono ignorati).
-3. L'emulatore si modifica solo sul branch `feature/lua-memory-write`, mai su `master` (D8).
+3. Le modifiche all'emulatore si fanno su un branch dedicato; il merge in `master` lo fa l'utente (D8, D12).
 4. Una prova che avvia l'emulatore senza il disco non vale (D11).
 5. I commit non portano righe `Co-Authored-By`.
 

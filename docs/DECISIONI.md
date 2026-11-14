@@ -63,3 +63,9 @@ a rintracciare gli asset della missione.
 ## D11 — L'emulatore si avvia sempre col disco
 **Scelta**: ogni prova parte con `--game=<AC2 .bin>`. **Perché**: una prova col solo BIOS non
 dice nulla sul remake (errore fatto e corretto il 2026-11-14).
+
+## D12 — Le funzioni di scrittura Lua sono in master dell'emulatore
+**Data**: 2026-11-14. **Fatto**: l'utente ha fuso `feature/lua-memory-write` in `master` di `ZonistationOne`
+(avanzamento rapido, `master` = `c59eb77`, già su `origin/master`). **Conseguenza**: D8 resta valida per il
+metodo (modifiche all'emulatore su un branch dedicato, merge a cura dell'utente) ma non serve più il checkout del
+branch per usare `emu.write_*`: basta `master`. Il branch remoto `feature/lua-memory-write` esiste ancora.

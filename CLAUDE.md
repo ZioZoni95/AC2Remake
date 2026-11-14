@@ -18,8 +18,9 @@ marchi sono di Namco/Sony.
 - **Nulla di estratto dal disco entra in git** (`out/`, `assets/`, `*.bin`, `*.mcd`). Prima di ogni push
   verifica `git ls-files`.
 - **Niente righe `Co-Authored-By` né "Generated with" nei commit** (richiesta esplicita dell'utente).
-- L'emulatore (`~/GitHub/ZonistationOne`, repo separato) è riferimento in sola lettura, **tranne** il
-  branch `feature/lua-memory-write` (aggiunge `emu.write_u8/16/32`); mai modificare `master` di quel repo.
+- L'emulatore (`~/GitHub/ZonistationOne`, repo separato) è riferimento in sola lettura. Se serve modificarlo
+  si lavora su un branch dedicato e **il merge in `master` lo fa l'utente**, mai Claude. `emu.write_u8/16/32`
+  (commit `c59eb77`) è già in `master`.
 - Ogni scoperta va in `docs/SCOPERTE.md` con la prova riproducibile; ogni scelta in `docs/DECISIONI.md`.
 - Non confermare mai come fatto ciò che non è stato eseguito: nei documenti ✅ = provato sul disco reale,
   ⚠️ = non ancora provato.

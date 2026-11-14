@@ -12,7 +12,7 @@ if [[ ! -d "$EMU/.git" ]]; then
 fi
 cd "$EMU"
 git fetch origin
-git checkout feature/lua-memory-write
+git checkout master && git pull --ff-only   # master contiene emu.write_* (commit c59eb77)
 if command -v make >/dev/null; then make -j"$(nproc)" || echo "ATTENZIONE: build fallita, vedi il README dell'emulatore (SDL3, glew...)"; fi
 
 echo

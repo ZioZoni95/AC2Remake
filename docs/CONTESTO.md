@@ -48,15 +48,15 @@ Attenzioni: se il gioco entra in **modalità demo** sul titolo i valori cambiano
 l'ultima modifica (click con breakpoint) **non è stato rieseguito**; il savestate dell'utente è locale a quella
 macchina (non in git). Il `ROOT MENU` si vede in alto a sinistra con glifi sporchi: è normale.
 
-**Idea in sospeso (non decisa):** un pannello "AC2" nel debug workspace dell'emulatore (ImGui, sul branch
-`feature/lua-memory-write`) con pulsanti per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug
+**Idea in sospeso (non decisa):** un pannello "AC2" nel debug workspace dell'emulatore (ImGui, su un branch
+dedicato, merge a cura dell'utente) con pulsanti per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug
 workspace ha già una *Lua Console* con esecuzione di codice e di file. Rimandato a dopo la prima missione avviata.
 
 ## Ambiente: cosa serve su una macchina nuova
 | Cosa | Dove sta | Come si ottiene |
 |---|---|---|
 | Questo repo | GitHub (privato) `ZioZoni95/AC2Remake` | `git clone` |
-| Emulatore | GitHub `ZioZoni95/ZonistationOne`, **branch `feature/lua-memory-write`** | `git clone` + `git checkout feature/lua-memory-write` + `make` (dipendenze: README dell'emulatore, SDL3) |
+| Emulatore | GitHub `ZioZoni95/ZonistationOne`, **`master`** (contiene `emu.write_*` dal commit `c59eb77`) | `git clone` + `make` (dipendenze: README dell'emulatore, SDL3) |
 | BIOS PAL `SCPH-7502.BIN` | **non in git** | copiare in `ZonistationOne/roms/` |
 | Disco `Ace Combat 2 (Europe).bin` | **non in git** | copiare in `ZonistationOne/games/` (usare il `.bin`) |
 | Asset estratti, disassemblati | non in git (`out/`) | rigenerare con `docs/GUIDA.md` §3–4 |
