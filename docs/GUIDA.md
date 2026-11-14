@@ -19,9 +19,9 @@ Percorsi usati nella guida:
 | Cosa | Comando | Stato |
 |---|---|---|
 | Python 3 (solo stdlib) | già presente | ✅ |
-| Java 21+25, Ghidra, binutils MIPS (`mipsel-linux-gnu-objdump`) | `./tools/install_re_tools.sh` (chiede `sudo`) | ⚠️ non ancora eseguito dall'utente; binutils MIPS è invece usato e funziona |
-| Godot 4 (ultima stabile, checksum verificato) | `./tools/install_godot.sh` (senza `sudo`) | ⚠️ non ancora eseguito |
-| Unity Hub (repo apt ufficiale) | `./tools/install_unity_hub.sh` (chiede `sudo`) | ⚠️ non ancora eseguito; Ubuntu 26.04 non è nell'elenco ufficiale di Unity |
+| Java 21+25, Ghidra, binutils MIPS (`mipsel-linux-gnu-objdump`) | `./tools/install_re_tools.sh` (chiede `sudo`) | ✅ Ghidra 12.2 + JDK 25 installati e usati in headless |
+| Godot 4 (ultima stabile, checksum verificato) | `./tools/install_godot.sh` (senza `sudo`) | ✅ 4.7.2 installato (comando `godot`); non ancora usato per aprire un modello |
+| Unity Hub (repo apt ufficiale) | `./tools/install_unity_hub.sh` (chiede `sudo`) | ✅ Hub 4.0.0 installato; l'Editor è in installazione (non verificato che sia finita); Ubuntu 26.04 non è nell'elenco ufficiale di Unity |
 
 Dopo Unity Hub: `unityhub` → *Installs → Install Editor* → Unity 6 LTS (serve probabilmente un
 account Unity per la licenza Personal: non verificato).
@@ -122,13 +122,29 @@ mipsel-linux-gnu-objdump -D -b binary -m mips:3000 -EL --adjust-vma=0x80018000 o
 Alternativa senza installare nulla: `python3 pipeline/mipsdis.py FILE BASE [OFFSET [N]]` (mini
 disassemblatore Python, solo istruzioni comuni; le GTE appaiono come `.word`).
 
-Ghidra (⚠️ non ancora installato): importare i due `.bin` come *Raw Binary*, lingua
-`MIPS:LE:32:default`, base `0x80018000` e `0x801c8000`. Per i nostri blob grezzi il plugin PSX non
-serve. Uso headless previsto: `~/Tools/ghidra/support/analyzeHeadless` (non ancora provato).
+**Ghidra** (✅ headless, versione 12.2). Il plugin PSX non serve per questi blob grezzi. Il codice del gioco
+usa molte variabili relative a `gp` ma l'header ha `gp=0`: va impostato (overlay `0x800b74f8`, loader
+`0x801e0108`, trovati nel codice di avvio) prima dell'analisi, con `SetGp.java`.
+
+```sh
+python3 -I -c "x=open('out/iso/SCES_006.99','rb').read(); open('out/main_exe.bin','wb').write(x[0x800:])"   # loader
+G=~/Tools/ghidra/support/analyzeHeadless; mkdir -p out/ghidra
+$G out/ghidra AC2 -import out/overlay0.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x80018000
+$G out/ghidra AC2 -import out/main_exe.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x801c8000
+# gp + analisi (una volta per binario)
+$G out/ghidra AC2 -process overlay0.bin -scriptPath pipeline/ghidra -preScript SetGp.java 800b74f8
+$G out/ghidra AC2 -process main_exe.bin -scriptPath pipeline/ghidra -preScript SetGp.java 801e0108
+# domande al progetto (i risultati escono nel log, righe "DecompileAt.java>" / "RefsTo.java>")
+$G out/ghidra AC2 -process overlay0.bin -noanalysis -scriptPath pipeline/ghidra -postScript DecompileAt.java 80066858
+$G out/ghidra AC2 -process overlay0.bin -noanalysis -scriptPath pipeline/ghidra -postScript RefsTo.java 800b8a60
+```
+Script in `pipeline/ghidra/`: `SetGp.java`, `DecompileAt.java` (decompila la funzione che contiene l'indirizzo e
+ne elenca i chiamanti), `RefsTo.java` (chi legge/scrive un indirizzo). L'analisi di ciascun binario richiede
+meno di un minuto.
 
 Dove guardare (già scoperto, vedi `docs/SCOPERTE.md`):
 - tabella titoli missioni: array di puntatori a `0x800ad8b4…0x800ad930` (Fighter's Honor è l'ultimo);
-- menu di debug `ROOT MENU` (GAME/BRIEFING/TITLE/FONT): struttura a `0x800ad2e0`, codice a `0x80067324`;
+- menu di debug `ROOT MENU`: gestito da `FUN_80066858` (`0x80066858`), voci a `0x800ad2e8`; **raggiunto e pilotato da Lua** (SCOPERTE #12–#14, vedi §2);
 - salvataggio: 860 byte + checksum a somma di byte; blocco vivo a `[0x801de228] + 0x8b4`.
 
 ---
@@ -143,8 +159,10 @@ Dove guardare (già scoperto, vedi `docs/SCOPERTE.md`):
 
 ## 6. Cosa manca (a oggi)
 
-- Raggiungere Fighter's Honor senza giocare: trovare come si attiva il menu di debug o come
-  riempire il blocco di avanzamento (SCOPERTE #10, #11).
+- **Avviare davvero Fighter's Honor** dal menu di debug (GAME, modulo 4) con lo stadio giusto: il menu è pilotato
+  da Lua ma nessuna missione è ancora partita; capire il significato di modulo 5 / stage 29 (SCOPERTE #14).
+- Riverificare `ac2_remote.lua` (ultima versione, click con breakpoint) alla prossima sessione.
 - Identificare l'aereo del giocatore e i nemici tra i 146 modelli; verificare la variante `sub3`.
 - Audio dal disco reale; `mission/mission.json` (spawn, waypoint, trigger).
 - Import in Godot (gate della Fase 2) e, poi, il confronto con Unity.
+- Idea non decisa: pannello "AC2" nel debug workspace dell'emulatore (vedi CONTESTO.md).
