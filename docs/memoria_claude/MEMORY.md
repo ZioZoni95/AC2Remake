@@ -1,0 +1,3 @@
+- [Emulatore sempre con il gioco](feedback_emulator-always-with-game.md) — lanciare ZoniStation_One sempre con --game=AC2, mai solo BIOS
+- [Stile di lavoro](feedback_working-style.md) — italiano e breve, commit/push solo su richiesta, niente co-autore, installazioni lanciate dall'utente, una sola finestra Godot
+- [Stato di AC2Remake](project_ac2remake-stato.md) — remake di Fighter's Honor: cosa e' fatto, cosa manca, da dove ripartire (CLAUDE.md, CONTESTO.md, GODOT.md §14)

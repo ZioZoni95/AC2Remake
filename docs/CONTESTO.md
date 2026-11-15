@@ -53,32 +53,14 @@ dal disco entra in git.
 | **`out/codice_leggibile/musica_fighters_honor.c`** | **scritto a mano**, derivato dal codice di Namco, **non rigenerabile e non versionabile**: copiare a mano (la scoperta è comunque descritta a parole in SCOPERTE #39) |
 | Progetti Ghidra (`out/ghidra`, `out/ghidra_ov1`) | si rifanno con GUIDA §4 (loader e overlay 0) e con il comando sotto (overlay 1); i nomi che l'utente ha dato a mano nella GUI **non** si ritrovano: esportare/copiare la cartella del progetto se servono |
 | `engines/godot/assets/` | `./tools/sync_godot_assets.sh` (ora copia anche le tracce 13, 22, 25, 26, 30, 31) |
+| Memoria di Claude (`~/.claude/projects/…/memory/`) | copia in `docs/memoria_claude/` (in git): ripristino in `RECUPERO_ASSET.md` §10 |
 | Savestate emulatore (`ZonistationOne/run/savestates/`) | locali; non servono |
 | Software (Godot 4.7.2, Ghidra 12.2 + JDK 21/25, binutils MIPS, Unity, Real-ESRGAN) | `docs/STRUMENTI.md`; Real-ESRGAN lo lancia l'utente (`bash tools/install_upscaler.sh`, il permesso blocca l'esecuzione automatica) |
 
-## Ricostruire `out/` (ordine, dopo aver copiato disco e BIOS)
-```sh
-cd ~/GitHub/AC2Remake
-python3 pipeline/tests/test_pipeline.py                                   # 18/18
-python3 -I pipeline/ac2_extract.py iso "$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin" out/iso
-python3 -I pipeline/ac2_extract.py all    out/iso/ACE2.DAT out/dat_all    # estrazione grezza completa + manifest.json
-python3 -I pipeline/ac2_extract.py tims   out/iso/ACE2.DAT out/tim
-python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT out/models     # 146 modelli attesi? (vedi GUIDA)
-python3 -I pipeline/ac2_aircraft.py all out/aerei
-python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor
-python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144
-python3 -I pipeline/ac2_audio.py tracks "…/Ace Combat 2 (Europe).bin" out/iso/ACE2.STH out/audio
-python3 -I pipeline/ac2_sfx_placeholder.py                                # effetti segnaposto
-gcc -O3 -o pipeline/mipsvm/mipsvm pipeline/mipsvm/mipsvm.c pipeline/mipsvm/gte.c pipeline/mipsvm/gte_ops.c
-./tools/sync_godot_assets.sh
-# Ghidra: GUIDA §4 (loader + overlay 0); overlay 1:
-python3 -I - <<'E'      # estrae overlay 1 (ACE2.DAT entry 1, offset 659456 + 0x800, 0x23000 byte, base 0x80160000)
-d=open("out/iso/ACE2.DAT","rb"); d.seek(659456+0x800); open("out/overlay1.bin","wb").write(d.read(0x23000))
-E
-~/Tools/ghidra/support/analyzeHeadless out/ghidra_ov1 OV1 -import out/overlay1.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x80160000
-```
-**Attenzione**: i nomi dei comandi sopra sono quelli usati oggi, ma la sequenza completa **non è stata rieseguita da zero** su una macchina pulita (⚠️).
-In caso di dubbio valgono `docs/GUIDA.md` e `docs/GODOT.md` §14.
+## Ricostruire `out/`
+Tutti i comandi, con i numeri attesi a ogni passo, stanno in **`docs/RECUPERO_ASSET.md`** (estrazione, audio, Godot, interprete MIPS, Ghidra,
+ricattura dello stato di inizio missione, memoria di Claude). Provati da zero il 2026-11-15 in una cartella temporanea: estrazione, audio, Ghidra overlay 0
+(⚠️ non provati: installazione strumenti, `sync_godot_assets.sh` da vuoto, ricattura).
 
 ## Comandi per vedere lo stato attuale
 ```sh

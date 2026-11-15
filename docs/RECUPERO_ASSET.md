@@ -4,7 +4,9 @@ Nulla di estratto dal disco sta in git. Su un PC nuovo, dopo `git clone`, `out/`
 **ricostruiti dal disco originale**. Questa guida dice come, in ordine, con **cosa deve uscire a ogni passo** per capire se è andata bene.
 Stato del lavoro e prossimi passi: `docs/CONTESTO.md`. Regole: `CLAUDE.md`.
 
-> ✅ = provato il 2026-11-15 sulla macchina di origine; ⚠️ = la sequenza completa **non è stata rieseguita da zero** su una macchina pulita.
+> **Verifica del 2026-11-15** (rifatta da zero in una cartella temporanea, senza toccare `out/`): ✅ passi 3, 4 (tracce audio), 8 (Ghidra overlay 0) con i numeri attesi
+> qui sotto. ⚠️ **Non provati su una macchina pulita**: installazione degli strumenti (passo 1, `bootstrap.sh`), `sync_godot_assets.sh` da `out/` vuoto, la
+> ricattura di `fh_start.bin` (passo 9, fatta una volta sola), le sonde Lua.
 
 ## Messaggio da incollare al Claude del PC nuovo
 
@@ -62,9 +64,10 @@ python3 -I pipeline/ac2_extract.py tims   out/iso/ACE2.DAT out/tim           # a
 python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT out/models        # atteso: 146 esportati, 0 saltati
 python3 -I pipeline/ac2_aircraft.py all out/aerei                            # 24 aerei con texture
 python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor             # blocco di Fighter's Honor (11 parti, 49 TIM, 13 unità)
-python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144   # 104400 poligoni, 25 texture, ~4 s
+python3 -I pipeline/ac2_export_godot.py out/fighters_honor/parte2_tabelle.json out/fighters_honor/mission.json   # mission.json (unità T1) per Godot
+python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144   # 108983 poligoni (104400 + 4583 gonne), 137888 vertici, 25 texture, ~4 s
 ```
-`ac2_mission.py extract` scrive anche `mission.json` e `parte2_tabelle.json`: le tabelle T1–T9 (SCOPERTE #24–#29).
+`ac2_mission.py extract` scrive `parte2_tabelle.json` (tabelle T1–T9, SCOPERTE #24–#29) e `manifest.json`; **`mission.json` lo scrive `ac2_export_godot.py`**.
 
 ## 4. Audio
 ```sh
@@ -93,19 +96,33 @@ godot --path engines/godot res://scenes/live_view.tscn -- --vm     # codice orig
 ```
 Una sola finestra Godot alla volta.
 
-## 8. Ghidra (codice del gioco)
-Loader e overlay 0: `docs/GUIDA.md` §4 (progetto `out/ghidra`, programmi `main_exe.bin` @`0x801c8000` e `overlay0.bin` @`0x80018000`;
-`out/main_exe.bin`/`out/overlay0.bin` si ricavano da `SCES_006.99` senza i primi 0x800 byte e da `ACE2.DAT` entry 0 dopo l'intestazione).
-Overlay 1 (ACE2.DAT entry 1, **non ancora studiato**):
+## 8. Ghidra (codice del gioco) ✅ provato da zero il 2026-11-15
+Il codice di gioco è quasi tutto nell'**overlay 0**; il loader (`SCES_006.99`) ha la libreria CD. Tutto da `~/GitHub/AC2Remake`:
 ```sh
-python3 -I - <<'E'
-d=open("out/iso/ACE2.DAT","rb"); d.seek(659456+0x800); open("out/overlay1.bin","wb").write(d.read(0x23000))
-E
-~/Tools/ghidra/support/analyzeHeadless out/ghidra_ov1 OV1 -import out/overlay1.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x80160000
-~/Tools/ghidra/support/analyzeHeadless out/ghidra_ov1 OV1 -process overlay1.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/overlay1
+python3 -I -c "r=open('out/iso/ACE2.DAT','rb').read(2048+657408); open('out/overlay0.bin','wb').write(r[2048+0x800:])"   # overlay 0, base 0x80018000
+python3 -I -c "x=open('out/iso/SCES_006.99','rb').read(); open('out/main_exe.bin','wb').write(x[0x800:])"                 # loader, base 0x801c8000
+G=~/Tools/ghidra/support/analyzeHeadless; mkdir -p out/ghidra out/codice
+$G out/ghidra AC2 -import out/overlay0.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x80018000   # ~46 s
+$G out/ghidra AC2 -import out/main_exe.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x801c8000
+$G out/ghidra AC2 -process overlay0.bin -scriptPath pipeline/ghidra -preScript SetGp.java 800b74f8       # registro gp del gioco
+$G out/ghidra AC2 -process main_exe.bin -scriptPath pipeline/ghidra -preScript SetGp.java 801e0108
+$G out/ghidra AC2 -process overlay0.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/overlay0   # atteso: 1217 funzioni, 0 fallite, ~30 s
+$G out/ghidra AC2 -process main_exe.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/loader     # atteso: 316 funzioni
+python3 -I pipeline/ghidra_split_mission.py out/codice    # missione_completa.c: attese 513 funzioni, 327768 byte
+```
+Prova da zero (cartella temporanea): `overlay0.bin` e `main_exe.bin` identici agli originali; export dell'overlay 0 = 1.217 funzioni, 0 fallite; stesse 513 funzioni
+della missione. Differenza trascurabile: la dimensione di una funzione fuori dalla missione (`FUN_80073f60`) può variare tra due analisi. Il loader non è stato
+reimportato nella prova (solo il file è identico). `out/codice/modulo_gioco.c` (funzioni del modulo di gioco, non della missione) **non ha uno script**: non serve per ora.
+
+Overlay 1 (ACE2.DAT entry 1, **non ancora studiato**), in un progetto separato:
+```sh
+python3 -I -c "d=open('out/iso/ACE2.DAT','rb'); d.seek(659456+0x800); open('out/overlay1.bin','wb').write(d.read(0x23000))"
+mkdir -p out/ghidra_ov1
+$G out/ghidra_ov1 OV1 -import out/overlay1.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x80160000
+$G out/ghidra_ov1 OV1 -process overlay1.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/overlay1   # 276 funzioni
 ```
 Il C decompilato finisce in `out/codice/*.c` (non versionato). Con la GUI aperta sul progetto, `analyzeHeadless` sullo stesso progetto fallisce
-(blocco in scrittura): usare un progetto separato o chiudere la GUI.
+(blocco in scrittura): usare un progetto separato o chiudere la GUI. Nella GUI gli indirizzi sono quelli del gioco: `G` e `80047470`.
 
 ## 9. Ricatturare lo stato di inizio missione (solo se manca `out/fh_start.bin`)
 1. Lancia l'emulatore **col disco** e la sonda, con percorso **assoluto**: `ZS1_LUA_SCRIPT=$HOME/GitHub/AC2Remake/pipeline/lua/ac2_remote.lua ./run_emulator.sh "Ace Combat 2 (Europe).bin"`.
@@ -113,6 +130,14 @@ Il C decompilato finisce in `out/codice/*.c` (non versionato). Con la GUI aperta
 3. **Solo allora** manda `pipeline/lua/ac2_capture_mission_start.lua` come comando (file temporaneo + `mv` su `/tmp/ac2_cmd.lua`): arma la cattura e scrive le 4 variabili.
 4. Il file `/tmp/fh_start_A.bin` (2.098.572 byte) va copiato in `out/fh_start.bin`. Controllo: `ac2_vm_frames.py out/fh_start.bin 11 0` stampa il giocatore a `(-47100, -7000, -102000)` dopo alcuni fotogrammi.
 5. Non usare `pkill -f` con il nome dell'emulatore: usare il PID.
+
+## 10. Memoria di Claude (opzionale ma utile)
+In `docs/memoria_claude/` ci sono le note che Claude aveva salvato sul progetto (stile di lavoro, regole, stato). Non sono né asset né dati personali
+(repo privato). Sul PC nuovo, dopo aver aperto una prima volta Claude Code nella cartella del progetto, copiarle nella sua cartella di memoria:
+```sh
+M=$(ls -d ~/.claude/projects/*AC2Remake*/ | head -1)memory; mkdir -p "$M" && cp docs/memoria_claude/*.md "$M"/
+```
+La cartella `~/.claude/projects/<percorso-con-trattini>/` esiste solo dopo la prima sessione in `~/GitHub/AC2Remake`. Anche senza, tutto ciò che serve sta in `CLAUDE.md` e `docs/`.
 
 ## Se qualcosa non torna
 - Numeri diversi dagli attesi → fermarsi e segnalarlo prima di proseguire (il disco potrebbe essere un'altra versione: serve la PAL `SCES-00699`).

@@ -74,6 +74,7 @@ CLAUDE.md       contesto e regole per Claude Code su una macchina nuova
 | [docs/CONTESTO.md](docs/CONTESTO.md) | **da leggere per primo su un altro PC**: stato, problema aperto, come riprendere |
 | [docs/GODOT.md](docs/GODOT.md) | **uso di Godot** nel progetto: struttura, comandi usati, visualizzatore (PS1 fedele / moderno), errori già fatti |
 | [docs/STRUMENTI.md](docs/STRUMENTI.md) | **tutti gli strumenti** usati e da scaricare: versione, fonte, comando di installazione, stato |
+| [docs/memoria_claude/](docs/memoria_claude/) | note di memoria di Claude sul progetto (come ripristinarle: RECUPERO_ASSET §10) |
 | [docs/RECUPERO_ASSET.md](docs/RECUPERO_ASSET.md) | **recuperare asset e strumenti su un altro PC**, passo per passo con i numeri attesi |
 | [docs/MULTI_PC.md](docs/MULTI_PC.md) | **lavorare su più PC**: cosa è in git, cosa no, come riprendere |
 | [docs/GUIDA.md](docs/GUIDA.md) | **come si usa tutto**: installazione, emulatore, estrazione, Ghidra (comandi verificati) |
