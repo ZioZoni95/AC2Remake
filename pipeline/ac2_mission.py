@@ -52,7 +52,7 @@ def decode_part2(p):
 
 
 AZIONI = {0: "attiva_unita", 1: "azzera_stato_unita", 2: "danno_hp", 3: "obiettivo_A", 4: "obiettivo_B", 5: "fine_missione_4",
-          6: "fine_missione_0x10", 7: "messaggio_radio", 8: "azzera_flag_unita", 9: "marcatore", 10: "sequenza_messaggi", 11: "dissolvenza"}
+          6: "fine_missione_0x10", 7: "messaggio_radio", 8: "azzera_flag_unita", 9: "marcatore", 10: "sequenza_messaggi", 11: "musica_sezione_2"}
 
 
 def decode_script(p, offs):

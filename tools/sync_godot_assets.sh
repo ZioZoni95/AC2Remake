@@ -10,6 +10,6 @@ cp -ur out/fighters_honor/models/. "$D/fighters_honor/" 2>/dev/null; rm -f "$D/f
 cp -u out/fighters_honor/terreno/terreno.i16 out/fighters_honor/terreno/terreno.json out/fighters_honor/terreno/terreno_mesh* "$D/fighters_honor/" 2>/dev/null || true
 cp -u out/fighters_honor/mission.json "$D/fighters_honor/" 2>/dev/null || echo "ATTENZIONE: manca mission.json (esegui ac2_export_godot.py)"
 mkdir -p "$D/audio"
-cp -u out/audio/sfx_*.wav out/audio/traccia_0[0-6]_*.wav "$D/audio/" 2>/dev/null || echo "ATTENZIONE: audio mancante (ac2_audio.py tracks, ac2_sfx_placeholder.py)"
+cp -u out/audio/sfx_*.wav out/audio/traccia_0[0-6]_*.wav out/audio/traccia_{13,22,25,26,30,31}_*.wav "$D/audio/" 2>/dev/null || echo "ATTENZIONE: audio mancante (ac2_audio.py tracks, ac2_sfx_placeholder.py)"
 mkdir -p "$D/fx"; cp -u out/tim/e002_1_3.png "$D/fx/explosion.png" 2>/dev/null || echo "ATTENZIONE: manca out/tim/e002_1_3.png (ac2_extract.py tims)"
 echo "Asset copiati in $D"

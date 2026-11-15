@@ -13,7 +13,7 @@ utilizzabili da qualunque motore (Godot 4, Unity). Nessuna dipendenza esterna: s
 | `tmd2gltf.py` | modelli TMD standard → OBJ + glTF 2.0. **I modelli di AC2 non sono TMD**: usare `acemodel.py` | ✅ fixture |
 | `ace2arc.py` | directory dell'archivio ACE2.DAT / ACE2.STH→STP, estrazione per indice, sniff TIM/TMD | ✅ fixture |
 | `ac2_aircraft.py` | i 24 aerei giocabili per nome o id (`list`, `export XFA-27 OUT`, `all OUT`): glTF texturizzato + OBJ | ✅ 24/24 |
-| `mipsvm/` | interprete MIPS R3000 + GTE per eseguire il codice originale su uno snapshot (SCOPERTE #31): `gcc -O2 -o mipsvm mipsvm.c gte.c gte_ops.c` | ✅ 0 diff sulle unità |
+| `mipsvm/` | interprete MIPS R3000 + GTE per eseguire il codice originale su uno snapshot (SCOPERTE #31): `gcc -O3 -o mipsvm mipsvm.c gte.c gte_ops.c` | ✅ 0 diff sulle unità |
 | `ac2_export_godot.py` | `parte2_tabelle.json` → `mission.json` per la scena Godot (40 unità T1 con posizione, categoria, squadra, tipo; punti T2) | ✅ FH |
 | `ghidra/ExportAll.java` | decompila tutte le funzioni di un binario in un file C + indice (base del reverse del codice di missione) | ✅ |
 | `ac2_audio.py` | flussi XA di ACE2.STP: `list`, `extract`, `tracks` (64 tracce STH → WAV) | ✅ disco reale |

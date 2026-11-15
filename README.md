@@ -7,7 +7,7 @@ unica che produce glTF, PNG, WAV e dati di missione, e due motori: **Godot 4** (
 
 Il repo è privato e contiene solo codice, script e documentazione: **nessun asset del gioco è versionato**.
 
-## Stato (2026-11-15)
+## Stato (2026-11-15, fine giornata)
 
 | Fase | Stato |
 |---|---|
@@ -74,9 +74,10 @@ CLAUDE.md       contesto e regole per Claude Code su una macchina nuova
 | [docs/CONTESTO.md](docs/CONTESTO.md) | **da leggere per primo su un altro PC**: stato, problema aperto, come riprendere |
 | [docs/GODOT.md](docs/GODOT.md) | **uso di Godot** nel progetto: struttura, comandi usati, visualizzatore (PS1 fedele / moderno), errori già fatti |
 | [docs/STRUMENTI.md](docs/STRUMENTI.md) | **tutti gli strumenti** usati e da scaricare: versione, fonte, comando di installazione, stato |
+| [docs/RECUPERO_ASSET.md](docs/RECUPERO_ASSET.md) | **recuperare asset e strumenti su un altro PC**, passo per passo con i numeri attesi |
 | [docs/MULTI_PC.md](docs/MULTI_PC.md) | **lavorare su più PC**: cosa è in git, cosa no, come riprendere |
 | [docs/GUIDA.md](docs/GUIDA.md) | **come si usa tutto**: installazione, emulatore, estrazione, Ghidra (comandi verificati) |
-| [docs/SCOPERTE.md](docs/SCOPERTE.md) | registro delle scoperte sul disco e sul codice, con prove (#1–#33) |
+| [docs/SCOPERTE.md](docs/SCOPERTE.md) | registro delle scoperte sul disco e sul codice, con prove (#1–#39) |
 | [docs/PIPELINE.md](docs/PIPELINE.md) | strumenti e formati: CD, TIM, container DAT, modello 3D di AC2, XA, archivio |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | fasi con gate verificabili, rischi e rimedi |
 | [docs/METODOLOGIA_RE.md](docs/METODOLOGIA_RE.md) | come si reverse-ingegnerizza la missione (prima dinamico, poi statico) |

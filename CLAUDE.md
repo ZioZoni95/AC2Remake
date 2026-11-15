@@ -6,7 +6,7 @@ la missione scelta è **FIGHTER'S HONOR** (l'ultima del gioco). Pipeline di estr
 marchi sono di Namco/Sony.
 
 **Per riprendere il lavoro su una macchina nuova leggi, nell'ordine:**
-1. `docs/CONTESTO.md` — stato attuale, prossimi passi, come ricostruire l'ambiente
+1. `docs/CONTESTO.md` — stato attuale, prossimi passi, come ricostruire l'ambiente; **`docs/RECUPERO_ASSET.md`** — guida passo per passo per recuperare asset e strumenti su un altro PC
 2. `docs/GUIDA.md` — comandi verificati (emulatore, estrazione, disassemblaggio)
 3. `docs/SCOPERTE.md` — tutto ciò che è stato scoperto sul disco (con prove)
 4. `docs/GODOT.md` (uso di Godot e comandi), `docs/STRUMENTI.md` (software da installare) e `docs/MULTI_PC.md` (lavoro su più macchine)

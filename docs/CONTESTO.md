@@ -1,97 +1,118 @@
 # Contesto e passaggio di consegne
 
-Fotografia del 2026-11-14. Serve a riprendere il lavoro da un altro PC senza la cronologia delle
+Fotografia del **2026-11-15** (fine giornata, cambio di PC). Serve a riprendere il lavoro da un altro PC senza la cronologia delle
 conversazioni (che non viaggia col repo). Se qualcosa qui contraddice `SCOPERTE.md`, vale `SCOPERTE.md`.
 
 ## Obiettivo
-Rifare in Godot 4 (poi confronto con Unity) la missione **Fighter's Honor** di Ace Combat 2, con asset
-estratti dal disco originale per uso personale e dati di missione ricostruiti dal reverse engineering.
+Rifare in **Godot 4** la missione **Fighter's Honor** (stadio 32, l'ultima) di Ace Combat 2 (PAL, `SCES-00699`), per uso personale:
+**comportamento originale** (si esegue il codice del gioco, non una riscrittura) e **grafica rimasterizzata** (texture 4×, normali,
+suddivisione, terreno ridisegnato). Unity solo come confronto opzionale (D3, D13). Asset e marchi sono di Namco/Sony: nulla di estratto
+dal disco entra in git.
+
+## Ordine di lavoro deciso dall'utente (2026-11-15)
+1. **Logica di missione originale**, letta dal codice con Ghidra e dal VM che lo esegue (in corso)
+2. Palette del terreno come le schiarisce il gioco (ora più scure)
+3. Cielo e nuvole
+4. Musica (traccia trovata; manca la logica a sezioni nella demo)
+5. Comandi (joypad) per ultimi
 
 ## Stato per fase
 | Fase | Stato |
 |---|---|
 | 0–1 Fondamenta, mappa disco/archivio | ✅ |
-| 2 Asset | ▶️ TIM (2.876) e modelli (146 glTF texturizzati) estratti; da fare: audio dal disco reale, identificare aereo giocatore/nemici, import in Godot |
-| 3 Reverse missione | ▶️ missione scelta; **bloccati** sul come raggiungerla senza completare il gioco |
-| 4–6 Slice Godot, Unity, chiusura | ⬜ |
+| 2 Asset | ✅ estrazione grezza **completa** (`ac2_extract.py all`: 226 entry, 95 MB, 10.654 sotto-file); aerei, TIM, terreno, audio XA ✅; ⚠️ 75 % dei byte ancora **non classificati** (SCOPERTE #37) |
+| 3 Reverse missione | ▶️ tabelle T1–T9 ✅; stati e vittoria ✅ (#36); musica ✅ (#38, #39); T7/T8/T3 da completare |
+| 4 Slice Godot | ▶️ demo di volo (`flight_demo`, logica semplificata mia) + vista con codice originale (`live_view -- --vm`); manca: logica originale dentro la demo |
+| 5 Unity | ⬜ opzionale |
 
-## Stato al 2026-11-14 (fine sessione)
-**Fatto e verificato:**
-- Fighter's Honor **si avvia dal titolo** scrivendo `[0x80010030]=32`, `[0x80010034]=0`, `[0x800b83fc]=4`,
-  `[0x800b892c]=1` (SCOPERTE #18; GUIDA §2b; script `pipeline/lua/ac2_start_fighters_honor.lua`, ⚠️ non ancora
-  rieseguito come script autonomo; `start_stage()` in `ac2_remote.lua` idem). Niente savestate di forzatura.
-- **Aerei**: i 24 giocabili (nomi, id 0–23, entry `30 + id`) estratti con texture: `ac2_aircraft.py` (SCOPERTE #22).
-- **Missione**: blocco dati di Fighter's Honor (entry 166; 165/167 = varianti) estratto: 11 parti grezze, 49 TIM,
-  13 unità texturizzate, VRAM ricostruita (`ac2_mission.py`, SCOPERTE #19, #20, #23). Texture TIM = VRAM del gioco al 100%.
-- In RAM a missione in corso: tabella tipi unità, pool di 63 oggetti da 372 B, struttura del giocatore (SCOPERTE #20, #21).
-- Strumenti: Godot 4.7.2, Unity Hub 4.0.0 + Editor 6000.6.9f1, Ghidra 12.2 (headless) + JDK 25, binutils MIPS.
+## Fatto e verificato (✅ = provato sul disco reale)
+- **Fighter's Honor si avvia** dal titolo scrivendo `[0x80010030]=32`, `[0x80010034]=0`, `[0x800b83fc]=4`, `[0x800b892c]=1` (GUIDA §2b).
+- **Interprete MIPS** (`pipeline/mipsvm/`, C): esegue il codice originale con 0 byte di differenza (#31). Ora anche **in servizio**
+  (`mipsvm --serve STATO [EXPORT]`: una riga `F TASTI` = un fotogramma originale, pad + `FUN_8002a1f4`; `S file` salva lo stato completo)
+  a ~11 ms/fotogramma con `gcc -O3` (con `-march=native` è più lento: non usarlo) (#35).
+- **Stato di inizio missione**: `out/fh_start.bin` (catturato dall'emulatore al primo fotogramma). 3000 fotogrammi senza errori.
+  **Non si rigenera con la pipeline**: va ricatturato (sotto) oppure copiato dall'altro PC.
+- **Joypad** nel codice originale (#34): buffer a `0x800b9040`; si chiama `FUN_8005f6a4` poi il fotogramma. Provato, non ancora collegato a Godot.
+- **Stati di missione** (#36): `_DAT_800b867c` 2 intro, 1 in gioco, 4 vittoria, 8 giocatore morto, 0x10 fallimento, 0x40/0x100 pausa/fine.
+  Vittoria = nessuna unità attiva con flag `0x800`.
+- **Musica** (#38, #39): "Dystopia" = **`traccia_13_ch0.wav`** (voce 13 di `ACE2.STH`; confermata dall'utente all'ascolto). Playlist dello stadio `0x21`:
+  `[13, 3, 30, 31, 22, 30, 31, 25, 26]`. La 13 va in **ciclo** finché non muoiono gli **8 bersagli a terra** (slot 12–19); allora parte la
+  traccia 3 in ciclo (azione 11 dello script, gruppo T9[4] alla morte dell'unità 35, provato nel VM).
+- **Caricamento da zero** (`mipsvm --boot out/iso/SCES_006.99 N`, #35): il loader gira 50 M istruzioni, ma **non carica ancora la missione**
+  (hook già fatti: `syscall`, root counter, VSync `0x801dc3b4`; mancano CD `FUN_801d9458/801dbd60/801dbe40`, lettura dei settori dal disco).
+- **Ghidra**: progetto `out/ghidra` (loader `main_exe.bin` @`0x801c8000`, overlay 0 `overlay0.bin` @`0x80018000`) e `out/ghidra_ov1`
+  (overlay 1 @`0x80160000`, entry `0x80160cc4`, **non ancora studiato**). Il codice di gioco è quasi tutto nell'**overlay 0**.
+  Nella GUI (`~/Tools/ghidra/ghidraRun`) gli indirizzi sono quelli del gioco: `G` + `80047470`.
 
-**Aggiornamento di fine sessione (SCOPERTE #28–#32):**
-- Script di missione decodificati: T1 unità (40), T2 posizioni, T4/T5/T6 profili e tipi, T7 manovre, T8 comportamento, T9 azioni, soglie T10.
-- **Terreno** ridisegnato dai poligoni e dalle texture originali delle tessere (parte 0): `ac2_terrain.py mesh`.
-- **Interprete MIPS** (`pipeline/mipsvm/`): il codice originale della missione gira fuori dall'emulatore con 0 byte di differenza sulle unità.
-- **Godot**: demo di volo (logica mia, semplificata), vista dal vivo (logica originale via emulatore), terreno e unità in versione moderna (texture 4×, luce, ombre).
-  Camera di inseguimento con distanza e campo visivo che crescono con la velocità. Tutti i comandi: `docs/GODOT.md` §11.
+## Cosa NON è in git e va portato o ricostruito sul PC nuovo
+| Cosa | Come |
+|---|---|
+| Disco `Ace Combat 2 (Europe).bin`, BIOS `SCPH-7502.BIN` | **copiare a mano** (`ZonistationOne/games/`, `ZonistationOne/roms/`) |
+| `out/` (estratti) | rigenerare, vedi "Ricostruire `out/`" |
+| **`out/fh_start.bin`** (2 MB) | copiare dall'altro PC **oppure** ricatturare con `pipeline/lua/ac2_capture_mission_start.lua` (GUIDA §2b, titolo → ROOT MENU → mandare lo script come comando) |
+| **`out/codice_leggibile/musica_fighters_honor.c`** | **scritto a mano**, derivato dal codice di Namco, **non rigenerabile e non versionabile**: copiare a mano (la scoperta è comunque descritta a parole in SCOPERTE #39) |
+| Progetti Ghidra (`out/ghidra`, `out/ghidra_ov1`) | si rifanno con GUIDA §4 (loader e overlay 0) e con il comando sotto (overlay 1); i nomi che l'utente ha dato a mano nella GUI **non** si ritrovano: esportare/copiare la cartella del progetto se servono |
+| `engines/godot/assets/` | `./tools/sync_godot_assets.sh` (ora copia anche le tracce 13, 22, 25, 26, 30, 31) |
+| Savestate emulatore (`ZonistationOne/run/savestates/`) | locali; non servono |
+| Software (Godot 4.7.2, Ghidra 12.2 + JDK 21/25, binutils MIPS, Unity, Real-ESRGAN) | `docs/STRUMENTI.md`; Real-ESRGAN lo lancia l'utente (`bash tools/install_upscaler.sh`, il permesso blocca l'esecuzione automatica) |
 
-**Prossimi passi, in ordine:**
-1. Sistemare le giunzioni del terreno (linee bianche) e verificare l'allineamento di z e delle unità sul terreno.
-2. **Comportamento originale dentro Godot**: collegare joypad e tempo all'interprete MIPS, integrarlo come estensione di Godot, disegnare con Godot, caricare i dati dal DAT senza snapshot.
-3. HUD originale, effetti (esplosioni, scie), cielo, audio; oggetti statici fuori dalle tessere; altre missioni.
-4. Semantica delle manovre T7 e dei nodi T8; ruolo di T3; confronto con altre missioni (stadio 0 Gambit).
-
-**Idea in sospeso (non decisa):** pannello "AC2" nel debug workspace dell'emulatore (ImGui, su un branch dedicato, merge a
-cura dell'utente) per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug workspace ha già una *Lua
-Console* con esecuzione di codice e di file.
-
-**Come riprendere (passi esatti):**
+## Ricostruire `out/` (ordine, dopo aver copiato disco e BIOS)
 ```sh
-cd ~/GitHub/ZonistationOne/run
-ZS1_LUA_SCRIPT=$HOME/GitHub/AC2Remake/pipeline/lua/ac2_remote.lua ZS1_LOG_STDERR=1 SDL_VIDEODRIVER=x11 \
-  ../ZoniStation_One ../roms/SCPH-7502.BIN --game="$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin" \
-  2>&1 | tee /tmp/remote.log
-# nella finestra: Space per saltare le FMV fino al titolo; dopo ~50-60 s compare ROOT MENU in alto a sinistra
-# comandi: scrivi in un file TEMPORANEO e poi mv (atomico: se la sonda legge il file mentre lo scrivi lo perde)
-echo 'menu_info()' > /tmp/ac2_cmd.tmp && mv /tmp/ac2_cmd.tmp /tmp/ac2_cmd.lua   # risultato nel log, prefisso [R]
+cd ~/GitHub/AC2Remake
+python3 pipeline/tests/test_pipeline.py                                   # 18/18
+python3 -I pipeline/ac2_extract.py iso "$HOME/GitHub/ZonistationOne/games/Ace Combat 2 (Europe).bin" out/iso
+python3 -I pipeline/ac2_extract.py all    out/iso/ACE2.DAT out/dat_all    # estrazione grezza completa + manifest.json
+python3 -I pipeline/ac2_extract.py tims   out/iso/ACE2.DAT out/tim
+python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT out/models     # 146 modelli attesi? (vedi GUIDA)
+python3 -I pipeline/ac2_aircraft.py all out/aerei
+python3 -I pipeline/ac2_mission.py extract 32 out/fighters_honor
+python3 -I pipeline/ac2_terrain.py mesh out/fighters_honor out/fighters_honor/terreno 262144
+python3 -I pipeline/ac2_audio.py tracks "…/Ace Combat 2 (Europe).bin" out/iso/ACE2.STH out/audio
+python3 -I pipeline/ac2_sfx_placeholder.py                                # effetti segnaposto
+gcc -O3 -o pipeline/mipsvm/mipsvm pipeline/mipsvm/mipsvm.c pipeline/mipsvm/gte.c pipeline/mipsvm/gte_ops.c
+./tools/sync_godot_assets.sh
+# Ghidra: GUIDA §4 (loader + overlay 0); overlay 1:
+python3 -I - <<'E'      # estrae overlay 1 (ACE2.DAT entry 1, offset 659456 + 0x800, 0x23000 byte, base 0x80160000)
+d=open("out/iso/ACE2.DAT","rb"); d.seek(659456+0x800); open("out/overlay1.bin","wb").write(d.read(0x23000))
+E
+~/Tools/ghidra/support/analyzeHeadless out/ghidra_ov1 OV1 -import out/overlay1.bin -overwrite -processor 'MIPS:LE:32:default' -cspec default -loader BinaryLoader -loader-baseAddr 0x80160000
 ```
-Attenzioni: se il gioco entra in **modalità demo** sul titolo i valori cambiano (è già successo); non usare
-`pkill -f "ZoniStation_One ..."` (uccide anche la shell che lo contiene: usare il PID); `ac2_remote.lua` dopo
-l'ultima modifica (click con breakpoint) **non è stato rieseguito**; il savestate dell'utente è locale a quella
-macchina (non in git). Il `ROOT MENU` si vede in alto a sinistra con glifi sporchi: è normale.
+**Attenzione**: i nomi dei comandi sopra sono quelli usati oggi, ma la sequenza completa **non è stata rieseguita da zero** su una macchina pulita (⚠️).
+In caso di dubbio valgono `docs/GUIDA.md` e `docs/GODOT.md` §14.
 
-**Idea in sospeso (non decisa):** un pannello "AC2" nel debug workspace dell'emulatore (ImGui, su un branch
-dedicato, merge a cura dell'utente) con pulsanti per aprire il menu, scegliere lo stadio e mostrare le variabili. Il debug
-workspace ha già una *Lua Console* con esecuzione di codice e di file. Rimandato a dopo la prima missione avviata.
-
-Uso di Godot: `docs/GODOT.md`. Strumenti e versioni: `docs/STRUMENTI.md`. Lavoro su più PC: `docs/MULTI_PC.md`.
-
-## Ambiente: cosa serve su una macchina nuova
-| Cosa | Dove sta | Come si ottiene |
-|---|---|---|
-| Questo repo | GitHub (privato) `ZioZoni95/AC2Remake` | `git clone` |
-| Emulatore | GitHub `ZioZoni95/ZonistationOne`, **`master`** (contiene `emu.write_*` dal commit `c59eb77`) | `git clone` + `make` (dipendenze: README dell'emulatore, SDL3) |
-| BIOS PAL `SCPH-7502.BIN` | **non in git** | copiare in `ZonistationOne/roms/` |
-| Disco `Ace Combat 2 (Europe).bin` | **non in git** | copiare in `ZonistationOne/games/` (usare il `.bin`) |
-| Asset estratti, disassemblati | non in git (`out/`) | rigenerare con `docs/GUIDA.md` §3–4 |
-| Java, Ghidra, Godot, Unity Hub | — | `tools/install_re_tools.sh`, `install_godot.sh`, `install_unity_hub.sh` |
-
-Layout atteso (`run_emulator.sh` lo dà per scontato): `~/GitHub/AC2Remake` e `~/GitHub/ZonistationOne`.
-Tutto in un comando: `./tools/bootstrap.sh` (clona, compila, controlla cosa manca; ⚠️ non ancora provato su una macchina pulita).
-
-## Verifica rapida che l'ambiente funzioni
+## Comandi per vedere lo stato attuale
 ```sh
-python3 pipeline/tests/test_pipeline.py                              # 18/18
-python3 -I pipeline/ac2_extract.py iso "<percorso>/Ace Combat 2 (Europe).bin" out/iso
-python3 -I pipeline/ac2_extract.py models out/iso/ACE2.DAT out/models  # attesi: 146 esportati, 0 saltati
-./run_emulator.sh "Ace Combat 2 (Europe).bin"                         # parte il gioco
+godot --path engines/godot res://scenes/flight_demo.tscn                  # demo (logica semplificata, musica = traccia 13)
+godot --path engines/godot res://scenes/live_view.tscn -- --vm            # codice ORIGINALE nell'interprete (da out/fh_start.bin), senza comandi
+pipeline/mipsvm/mipsvm --serve out/fh_start.bin /tmp/ac2_state.bin        # il servizio da solo (stdin: "F 0", "S file", "Q")
+python3 -I pipeline/ac2_vm_frames.py out/fh_start.bin 40 0x80             # N fotogrammi con tasti iniettati
 ```
+Una sola finestra Godot alla volta (più finestre fanno crollare gli FPS). L'emulatore si avvia **sempre col disco**; per le sonde Lua
+usare il **percorso assoluto** dello script (`run_emulator.sh` fa `cd` nella cartella dell'emulatore: un percorso relativo non carica nulla).
 
-## Stato degli strumenti sulla macchina di origine (2026-11-14)
-Godot 4.7.2 ✅, Unity Hub 4.0.0 ✅ + Editor 6000.6.9f1 ✅, binutils MIPS ✅, Java 21+25 ✅;
-Ghidra 12.2 e JDK 25 ✅; Unity Editor 6000.6.9f1 installato ✅ (mai avviato: su Ubuntu 26.04 non è nell'elenco ufficiale di Unity).
+## Prossimi passi (in ordine)
+1. **Demo con la musica originale**: Dystopia (13) in ciclo, passaggio alla 3 quando muoiono gli 8 bersagli; poi i jingle di fine missione.
+2. **Logica di missione originale nella demo**: leggere dal VM bersagli rimasti, stato missione, unità distrutte e usarli al posto della mia logica.
+3. Caricamento **senza snapshot**: finire gli hook CD di `--boot` per far caricare la missione al loader.
+4. Palette del terreno, poi cielo e nuvole, poi comandi (joypad nel VM + tasti Godot).
+5. Dati ancora ignoti (#37): testi radio/briefing, effetti sonori (nessun VAB trovato nel DAT), video `STP` canale 8, altri 32 stadi, overlay 1.
+
+## Domande aperte
+- Perché l'azione T9[0] indica `arg4 = 36` mentre scendono i PF dello slot 35.
+- Cosa suonano e quando i jingle di fine missione (voci 2–8 della playlist); come si ripete la traccia 3.
+- Cosa contiene l'overlay 1 (entry 1 del DAT).
+- T7 (manovre), T8 (campi di rotta), T3 (ruolo); orientamento di z e allineamento unità/terreno.
+
+## Regole che valgono sempre (le ha date l'utente)
+Italiano e risposte brevi (usa il modo "caveman" per risparmiare token); commit e push **solo** su richiesta; **mai** `Co-Authored-By` né
+"Generated with"; prima di ogni push `git ls-files` senza asset; emulatore sempre col disco; `ZonistationOne` in sola lettura (branch dedicato,
+merge dell'utente); non usare `pkill -f` con il nome dell'emulatore (usare il PID); comandi alle sonde Lua in file temporaneo + `mv`.
+
+Uso di Godot: `docs/GODOT.md`. Strumenti: `docs/STRUMENTI.md`. Lavoro su più PC: `docs/MULTI_PC.md`.
 
 ## Errori già fatti (da non ripetere)
-- Avviare l'emulatore senza `--game`. 
-- Scansione ricorsiva dei TIM senza validare la lunghezza: migliaia di falsi positivi.
-- Header del modello letto come 16 B (sono 8) e numero di vertici stimato a occhio.
-- Decoder TIM 4bpp con indice pixel `c//4` (era `c//2`); la fixture solo 16bpp non lo vedeva.
-- Letto l'header dell'entry 0 dall'inizio del DAT invece che da +2048.
+- Avviare l'emulatore senza `--game`; percorso relativo dello script Lua (non si carica, nessun errore visibile).
+- `lui 0x800c` + addendo **negativo** = `0x800b…`, non `0x800c…` (mi ha fatto cercare i buffer del joypad all'indirizzo sbagliato).
+- Disassemblare `SCES_006.99` con base `0x801c8000`: l'intestazione di 0x800 byte sposta tutto; la base giusta per il file intero è `0x801c7800`.
+- Scansione ricorsiva dei TIM senza validare la lunghezza; header del modello letto come 16 B (sono 8); decoder TIM 4bpp con `c//4`.
+- Ipotizzare il segno del rollio in Godot senza verificarlo a schermo; dare per buono che "azione 11 = dissolvenza" (era il cambio musica).

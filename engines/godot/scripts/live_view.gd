@@ -11,14 +11,45 @@ const SLOT_SIZE := 0x174
 var _last_frame := -1
 var _prev_pos := Vector3.ZERO
 var _vel := 0.0
-var _roll_sign := -1.0
+var _roll_sign := 1.0   # verificato con l interprete: sinistra = rollio negativo = ala sinistra giu (SCOPERTE #34)
 var _cz2 := 1.0
+var _vm: Dictionary = {}      # modo --vm: servizio mipsvm (codice originale nell'interprete, senza emulatore)
+var _vm_acc := 0.0
+var _vm_btn := 0
 
 func _ready() -> void:
 	super._ready()
 	if _player.get_child_count() > 0:
 		(_player.get_child(0) as Node3D).rotation.y = 0.0   # qui il naso (+Z) e' gia' la direzione di avanti
 	_hud.text = "In attesa dello stato dal gioco (/tmp/ac2_state.bin)..."
+	if "--vm" in OS.get_cmdline_user_args():
+		_start_vm()
+
+## --vm: esegue il codice ORIGINALE nell'interprete (pipeline/mipsvm) a 50 Hz; stato iniziale = snapshot out/fh_start.bin.
+func _start_vm() -> void:
+	var root := ProjectSettings.globalize_path("res://").path_join("../..").simplify_path()
+	var snap := root.path_join("out/fh_start.bin")
+	var vm := root.path_join("pipeline/mipsvm/mipsvm")
+	if not FileAccess.file_exists(snap) or not FileAccess.file_exists(vm):
+		_hud.text = "--vm: manca %s o %s (vedi docs/GODOT.md)" % [snap, vm]
+		return
+	DirAccess.remove_absolute(STATE)
+	_vm = OS.execute_with_pipe(vm, ["--serve", snap, STATE])
+	_hud.text = "Codice originale nell'interprete MIPS (50 Hz)..."
+
+func _vm_tick(dt: float) -> void:
+	if _vm.is_empty():
+		return
+	_vm_acc = minf(_vm_acc + dt, 0.1)
+	var out: FileAccess = _vm["stdio"]
+	while _vm_acc >= 0.02:
+		_vm_acc -= 0.02
+		out.store_string("F %d\n" % _vm_btn)
+		out.flush()
+
+func _exit_tree() -> void:
+	if not _vm.is_empty():
+		OS.kill(_vm["pid"])
 
 func _pose(buf: PackedByteArray, base: int) -> Array:
 	var p := Vector3(buf.decode_s32(base + 36) / 2048.0, buf.decode_s32(base + 40) / 2048.0, buf.decode_s32(base + 44) / 2048.0)
@@ -39,6 +70,7 @@ func _unhandled_input(e: InputEvent) -> void:
 		if e.keycode == KEY_EQUAL or e.keycode == KEY_KP_ADD: _cz2 = maxf(_cz2 / 1.15, 0.4)
 
 func _process(dt: float) -> void:
+	_vm_tick(dt)
 	if not FileAccess.file_exists(STATE):
 		return
 	var f := FileAccess.open(STATE, FileAccess.READ)
@@ -81,4 +113,5 @@ func _process(dt: float) -> void:
 		_cam.position = newp - fwd * lerpf(5.2, 7.0, k) * _cz2 + Vector3.UP * lerpf(1.6, 2.2, k) * _cz2
 		_cam.look_at(newp + fwd * 8.0, Vector3.UP)
 	_hud2.d = _hud_data(1.0, _vel); _hud2.queue_redraw()
-	_hud.text = "ORIGINALE dal vivo (frame %d)   C camera   +/- distanza   Si pilota nell'emulatore" % frame
+	_hud.text = ("ORIGINALE nell'interprete (frame %d)   C camera   +/- distanza   comandi: da collegare" % frame) if not _vm.is_empty() \
+		else ("ORIGINALE dal vivo (frame %d)   C camera   +/- distanza   Si pilota nell'emulatore" % frame)

@@ -4,6 +4,7 @@
   ac2_extract.py iso    DISCO.bin OUT      file ISO (tranne ACE2.STP, 407 MB) in OUT/
   ac2_extract.py tims   OUT/ACE2.DAT OUT   tutti i TIM validati (ricerca ricorsiva nei container) -> PNG
   ac2_extract.py models OUT/ACE2.DAT OUT   tutti i modelli (geometria + TIM) -> glTF texturizzato + PNG per palette
+  ac2_extract.py all    OUT/ACE2.DAT OUT   TUTTE le 226 entry: ogni sotto-file grezzo + classificazione + manifest.json (copertura)
 
 Un TIM e' accettato solo se la sua lunghezza dichiarata (CLUT + immagine) sta nel sotto-file
 (altrimenti la ricerca ricorsiva da' migliaia di falsi positivi: SCOPERTE #7).
@@ -111,8 +112,61 @@ def cmd_models(dat, out):
     print(f"modelli esportati: {ok}  saltati: {bad}")
 
 
+MAGIC = {b"pBAV": "banco_suoni_VAB", b"VAGp": "campione_VAG", b"pQES": "sequenza_SEQ", b"SShd": "SShd", b"STR\x00": "STR"}
+
+
+def classify(s):
+    """Tipo riconosciuto di un sotto-file (le etichette con ? sono ipotesi da euristica)."""
+    if s[:8] == b"PS-X EXE":
+        return "eseguibile_PSX"
+    if valid_tim(s):
+        return "TIM"
+    if len(s) >= 16 and struct.unpack_from("<H", s, 6)[0] == 0x5907:
+        return "tessera_terreno"
+    for m, k in MAGIC.items():
+        if s[:4] == m:
+            return k
+    if len(s) >= 16 and sum(1 for c in s[:256] if 32 <= c < 127 or c in (9, 10, 13)) >= 0.9 * min(len(s), 256):
+        return "testo?"
+    return "dati"
+
+
+def leaves(b, tag, depth=0):
+    """Scende nei container annidati: rende (percorso, bytes) delle foglie e dei container stessi come nodo."""
+    subs = list(containers(b, 0) or ()) if depth < 6 and not valid_tim(b) and b[:8] != b"PS-X EXE" else []
+    if subs:
+        for j, s in subs:
+            yield from leaves(s, f"{tag}/{j}", depth + 1)
+    else:
+        yield tag, b
+
+
+def cmd_all(dat, out):
+    import json, collections
+    os.makedirs(out, exist_ok=True)
+    ents = read_dat(dat)
+    manifest, cnt, size = [], collections.Counter(), collections.Counter()
+    with open(dat, "rb") as f:
+        for e in ents:
+            f.seek(e["off"]); b = f.read(e["size"])
+            rows = []
+            for path, s in leaves(b, "e%03d" % e["idx"]):
+                k = classify(s)
+                d = os.path.join(out, "e%03d" % e["idx"]); os.makedirs(d, exist_ok=True)
+                fn = path.replace("/", "_") + ".bin"
+                open(os.path.join(d, fn), "wb").write(s)
+                rows.append({"percorso": path, "file": "e%03d/%s" % (e["idx"], fn), "byte": len(s), "tipo": k, "testa": s[:8].hex()})
+                cnt[k] += 1; size[k] += len(s)
+            manifest.append({"entry": e["idx"], "offset": e["off"], "byte": e["size"], "foglie": rows})
+    json.dump(manifest, open(os.path.join(out, "manifest.json"), "w"), indent=1)
+    tot = sum(size.values())
+    print(f"{len(ents)} entry, {sum(cnt.values())} sotto-file, {tot // 1024} KB salvati in {out}")
+    for k in sorted(size, key=lambda x: -size[x]):
+        print(f"  {k:20s} {cnt[k]:6d} file {size[k] // 1024:8d} KB  ({100 * size[k] / tot:.1f}%)")
+
+
 if __name__ == "__main__":
-    cmds = {"iso": cmd_iso, "tims": cmd_tims, "models": cmd_models}
+    cmds = {"iso": cmd_iso, "tims": cmd_tims, "models": cmd_models, "all": cmd_all}
     if len(sys.argv) != 4 or sys.argv[1] not in cmds:
         print(__doc__); sys.exit(2)
     cmds[sys.argv[1]](sys.argv[2], sys.argv[3])

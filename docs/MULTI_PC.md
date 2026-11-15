@@ -13,7 +13,8 @@ Prima di ogni push: `git ls-files | grep -iE '\.(bin|dat|png|gltf|obj|dis|mcd|zs
 | Cosa | Come |
 |---|---|
 | Disco `Ace Combat 2 (Europe).bin` e BIOS `SCPH-7502.BIN` | copiare a mano (`ZonistationOne/games/`, `ZonistationOne/roms/`) |
-| `out/` (estratti, disassemblati, progetto Ghidra) | rigenerare: `docs/GUIDA.md` §3–4 (pochi minuti) |
+| `out/` (estratti, disassemblati, progetto Ghidra) | rigenerare: **`docs/RECUPERO_ASSET.md`** (passo per passo, con i numeri attesi) |
+| `out/fh_start.bin` (stato di inizio missione, 2 MB) e `out/codice_leggibile/` (scritto a mano) | **copiare a mano** (il primo si può ricatturare, il secondo no) |
 | `engines/godot/assets/` | `./tools/sync_godot_assets.sh` dopo aver rigenerato `out/` |
 | Savestate (`ZonistationOne/run/savestates/slot0.zst`, ~4,7 MB) | si può copiare a mano da una macchina all'altra; oppure rifare l'avvio dal titolo (GUIDA §2b) |
 | Memory card, log (`ZonistationOne/run/`) | non servono |

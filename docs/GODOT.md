@@ -276,7 +276,7 @@ Attenzione: più finestre Godot aperte insieme fanno crollare gli FPS (chiudi qu
 
 **Emulatore e interprete MIPS** (SCOPERTE #31):
 ```sh
-gcc -O2 -o pipeline/mipsvm/mipsvm pipeline/mipsvm/mipsvm.c pipeline/mipsvm/gte.c pipeline/mipsvm/gte_ops.c        # compila l'interprete
+gcc -O3 -o pipeline/mipsvm/mipsvm pipeline/mipsvm/mipsvm.c pipeline/mipsvm/gte.c pipeline/mipsvm/gte_ops.c        # compila l'interprete
 ./pipeline/mipsvm/mipsvm out/ac2_cpuA.bin 8002bcdc 8002a3ec 200000000 out/vm_out.bin                                # esegue FUN_8002bcdc su uno snapshot (STATO START STOP MAX OUT)
 ~/Tools/ghidra/support/analyzeHeadless out/ghidra AC2 -process overlay0.bin -noanalysis -scriptPath pipeline/ghidra -postScript ExportAll.java out/codice/overlay0   # tutto il codice in C
 ```

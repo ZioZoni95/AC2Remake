@@ -129,7 +129,9 @@ func _setup_audio() -> void:
 			_tracks.append(fn)
 	_tracks.sort()
 	if _tracks.size() > 0:
-		_play_track(0)
+		# musica di Fighter's Honor = "Dystopia" = voce 13 di ACE2.STH (SCOPERTE #38, confermata all'ascolto)
+		var fh := _tracks.find("traccia_13_ch0.wav")
+		_play_track(maxi(fh, 0))
 
 func _play_track(i: int) -> void:
 	_ti = posmod(i, _tracks.size())
