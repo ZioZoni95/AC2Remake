@@ -9,7 +9,7 @@ metadata:
 ---
 
 - **Lingua italiana**, risposte **brevi** (stile caveman: l'utente lo usa perche' i token di output pesano sul limite d'uso a finestre di 5 ore). Dire onestamente cosa e' verificato (✅) e cosa no (⚠️); non confermare come fatto cio' che non e' stato eseguito.
-- **Commit e push solo quando l'utente li chiede** ("commit e push"). **Mai** righe `Co-Authored-By` ne' "Generated with" nei commit (richiesta esplicita): prima di ogni push controllare `git ls-files` (nessun asset del gioco: `out/`, `assets/`, `*.bin`, `*.wav`, `*.gltf`, `*.png` estratti).
+- **Commit e push solo quando l'utente li chiede** ("commit e push"). **Mai** righe `Co-Authored-By` ne' "Generated with" nei commit (richiesta esplicita): prima di ogni push controllare `git ls-files` (nessun asset del gioco, **eccezione voluta dall'utente il 2026-11-15, repo privato: `savestati/*.zst`**; altrimenti: `out/`, `assets/`, `*.bin`, `*.wav`, `*.gltf`, `*.png` estratti).
 - **Software di terze parti da scaricare/eseguire** (es. `tools/install_upscaler.sh`, Real-ESRGAN): il sistema di permessi blocca l'esecuzione automatica; preparare lo script e farlo lanciare all'utente con `bash tools/...`.
 - **L'emulatore si avvia sempre con il disco** (`--game=`), mai solo col BIOS. Modifiche a `ZonistationOne` solo su un branch dedicato; il merge in `master` lo fa l'utente.
 - Prima di lanciare una scena Godot chiudere le finestre vecchie: **piu' finestre aperte fanno crollare gli FPS** (l'utente l'ha notato).

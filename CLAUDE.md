@@ -6,7 +6,7 @@ la missione scelta è **FIGHTER'S HONOR** (l'ultima del gioco). Pipeline di estr
 marchi sono di Namco/Sony.
 
 **Per riprendere il lavoro su una macchina nuova leggi, nell'ordine:**
-1. `docs/CONTESTO.md` — stato attuale, prossimi passi, come ricostruire l'ambiente; **`docs/RECUPERO_ASSET.md`** — guida passo per passo per recuperare asset e strumenti su un altro PC
+1. `docs/CONTESTO.md` — stato attuale, prossimi passi, come ricostruire l'ambiente; **`docs/RECUPERO_ASSET.md`** — guida passo per passo per recuperare asset e strumenti su un altro PC (stato di inizio missione e C leggibile si rigenerano da soli)
 2. `docs/GUIDA.md` — comandi verificati (emulatore, estrazione, disassemblaggio)
 3. `docs/SCOPERTE.md` — tutto ciò che è stato scoperto sul disco (con prove)
 4. `docs/GODOT.md` (uso di Godot e comandi), `docs/STRUMENTI.md` (software da installare) e `docs/MULTI_PC.md` (lavoro su più macchine)
@@ -16,8 +16,9 @@ marchi sono di Namco/Sony.
 
 - **L'emulatore si avvia SEMPRE col disco** (`./run_emulator.sh "Ace Combat 2 (Europe).bin"`), mai col
   solo BIOS: una prova senza gioco non dice nulla.
-- **Nulla di estratto dal disco entra in git** (`out/`, `assets/`, `*.bin`, `*.mcd`). Prima di ogni push
-  verifica `git ls-files`.
+- **Nulla di estratto dal disco entra in git** (`out/`, `assets/`, `*.bin`, `*.mcd`, C decompilato). Prima di ogni push
+  verifica `git ls-files`. **Unica eccezione, voluta dall'utente (2026-11-15, repo privato): `savestati/*.zst`** (savestate dell'emulatore).
+  Il repo deve restare privato.
 - **Niente righe `Co-Authored-By` né "Generated with" nei commit** (richiesta esplicita dell'utente).
 - L'emulatore (`~/GitHub/ZonistationOne`, repo separato) è riferimento in sola lettura. Se serve modificarlo
   si lavora su un branch dedicato e **il merge in `master` lo fa l'utente**, mai Claude. `emu.write_u8/16/32`

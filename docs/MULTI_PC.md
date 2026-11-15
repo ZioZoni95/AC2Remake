@@ -5,8 +5,9 @@ Il progetto si usa da più macchine. Qui c'è cosa viaggia con il repo, cosa no,
 ## Cosa sta in git (si ritrova con `git clone`)
 
 Codice (`pipeline/`, `engines/godot` senza asset, `tools/`), documentazione (`docs/`, `README.md`, `CLAUDE.md`), sonde Lua e
-script Ghidra. **Mai** asset del gioco: `out/`, `assets/`, `engines/godot/assets/`, `*.bin`, `*.mcd`, `*.zst` sono ignorati.
-Prima di ogni push: `git ls-files | grep -iE '\.(bin|dat|png|gltf|obj|dis|mcd|zst)$'` deve dare zero righe.
+script Ghidra, memoria di Claude (`docs/memoria_claude/`) e i **savestate** (`savestati/`, eccezione voluta dall'utente, repo privato). **Mai** altri asset del gioco:
+`out/`, `assets/`, `engines/godot/assets/`, `*.bin`, `*.mcd` sono ignorati. Prima di ogni push: `git ls-files | grep -iE '\.(bin|dat|png|gltf|obj|dis|mcd|zst)$'`
+deve dare solo `savestati/slot*.zst`.
 
 ## Cosa NON viaggia (va ricreato o copiato)
 
@@ -16,7 +17,7 @@ Prima di ogni push: `git ls-files | grep -iE '\.(bin|dat|png|gltf|obj|dis|mcd|zs
 | `out/` (estratti, disassemblati, progetto Ghidra) | rigenerare: **`docs/RECUPERO_ASSET.md`** (passo per passo, con i numeri attesi) |
 | `out/fh_start.bin` (stato di inizio missione, 2 MB) e `out/codice_leggibile/` (scritto a mano) | **copiare a mano** (il primo si può ricatturare, il secondo no) |
 | `engines/godot/assets/` | `./tools/sync_godot_assets.sh` dopo aver rigenerato `out/` |
-| Savestate (`ZonistationOne/run/savestates/slot0.zst`, ~4,7 MB) | si può copiare a mano da una macchina all'altra; oppure rifare l'avvio dal titolo (GUIDA §2b) |
+| Savestate | **in git** (`savestati/`): copiarli in `ZonistationOne/run/savestates/` (RECUPERO_ASSET §12) |
 | Memory card, log (`ZonistationOne/run/`) | non servono |
 | Cronologia delle conversazioni con Claude e la sua memoria locale (`~/.claude/...`) | **non viaggiano**: tutto ciò che serve sta in `CLAUDE.md` e `docs/` |
 | Software (Ghidra, Godot, Unity, Real-ESRGAN, Java) | `docs/STRUMENTI.md` |

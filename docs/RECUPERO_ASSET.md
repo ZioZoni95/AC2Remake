@@ -17,14 +17,19 @@ Stato del lavoro e prossimi passi: `docs/CONTESTO.md`. Regole: `CLAUDE.md`.
 
 ## 0. Cosa deve fare l'utente a mano (Claude non può)
 
+Disco e BIOS sono già sull'altro PC dell'utente: vanno solo **messi al posto giusto** (copiati dal PC vecchio o da dove li ha).
+
 | Cosa | Dove metterla |
 |---|---|
 | Disco `Ace Combat 2 (Europe).bin` (e `.cue`) | `~/GitHub/ZonistationOne/games/` |
 | BIOS PAL `SCPH-7502.BIN` | `~/GitHub/ZonistationOne/roms/` |
-| `out/fh_start.bin` (2 MB, stato di inizio missione) dal PC vecchio | `~/GitHub/AC2Remake/out/fh_start.bin` (oppure ricatturarlo: passo 9) |
-| `out/codice_leggibile/musica_fighters_honor.c` (scritto a mano, derivato dal codice di Namco, **mai in git**) | `~/GitHub/AC2Remake/out/codice_leggibile/` |
-| Cartelle dei progetti Ghidra `out/ghidra` e `out/ghidra_ov1` **solo se** contengono nomi dati a mano nella GUI | stesse posizioni (altrimenti si rifanno, passo 8) |
-| Installare i programmi lanciati dall'utente (es. Real-ESRGAN: `bash tools/install_upscaler.sh`) | — |
+| Installare i programmi che Claude non può scaricare/eseguire (Real-ESRGAN: `bash tools/install_upscaler.sh`) | — |
+
+**Tutto il resto Claude lo ricrea da solo** (non serve copiare altro dal PC vecchio):
+- `out/fh_start.bin` → `./tools/capture_mission_start.sh` (passo 9, ✅ provato: ~41 s, automatico);
+- `out/codice_leggibile/` → passo 11 (script + riscrittura guidata);
+- savestate dell'emulatore → sono **già nel repo** in `savestati/` (passo 12);
+- progetti Ghidra → passo 8 (i nomi dati a mano nella GUI, se ce ne sono, non si ritrovano: copiare le cartelle `out/ghidra*` solo in quel caso).
 
 `ZonistationOne` deve stare su `master` aggiornato (contiene `emu.write_*`) e affiancato ad `AC2Remake`.
 
@@ -124,12 +129,17 @@ $G out/ghidra_ov1 OV1 -process overlay1.bin -noanalysis -scriptPath pipeline/ghi
 Il C decompilato finisce in `out/codice/*.c` (non versionato). Con la GUI aperta sul progetto, `analyzeHeadless` sullo stesso progetto fallisce
 (blocco in scrittura): usare un progetto separato o chiudere la GUI. Nella GUI gli indirizzi sono quelli del gioco: `G` e `80047470`.
 
-## 9. Ricatturare lo stato di inizio missione (solo se manca `out/fh_start.bin`)
-1. Lancia l'emulatore **col disco** e la sonda, con percorso **assoluto**: `ZS1_LUA_SCRIPT=$HOME/GitHub/AC2Remake/pipeline/lua/ac2_remote.lua ./run_emulator.sh "Ace Combat 2 (Europe).bin"`.
-2. Salta le FMV con START fino al titolo; dopo ~50–60 s compare il ROOT MENU in alto a sinistra (GUIDA §2b).
-3. **Solo allora** manda `pipeline/lua/ac2_capture_mission_start.lua` come comando (file temporaneo + `mv` su `/tmp/ac2_cmd.lua`): arma la cattura e scrive le 4 variabili.
-4. Il file `/tmp/fh_start_A.bin` (2.098.572 byte) va copiato in `out/fh_start.bin`. Controllo: `ac2_vm_frames.py out/fh_start.bin 11 0` stampa il giocatore a `(-47100, -7000, -102000)` dopo alcuni fotogrammi.
-5. Non usare `pkill -f` con il nome dell'emulatore: usare il PID.
+## 9. Stato di inizio missione `out/fh_start.bin` (automatico) ✅ provato il 2026-11-15
+```sh
+./tools/capture_mission_start.sh        # richiede emulatore compilato, BIOS e disco al loro posto; ~41 s
+python3 -I pipeline/ac2_vm_frames.py out/fh_start.bin 11 0     # controllo: giocatore a z ≈ -149904 che cresce di ~96 a fotogramma
+```
+Cosa fa: lancia l'emulatore **col disco** con `pipeline/lua/ac2_auto_capture_start.lua` (percorso assoluto: la Lua si carica dalla cartella dell'emulatore),
+che aspetta il titolo (le FMV finiscono da sole, non serve premere nulla), scrive le 4 variabili di avvio e salva lo stato al primo
+ingresso di `FUN_8002bcdc`. Poi chiude l'emulatore col suo PID e sposta il file. Si apre una finestra dell'emulatore per ~1 minuto: non toccarla.
+Attesi: file di **2.098.572 byte**; `pc = 0x8002bcdc`, modulo 4, stadio 32, aereo 0, stato missione 2. Due catture differiscono per poche centinaia di
+parole (contatori di tempo): è normale. Se fallisce: `/tmp/capture_mission_start.log`. Non usare `pkill -f` con il nome dell'emulatore.
+Alternativa manuale (ROOT MENU e sonda remota): `pipeline/lua/ac2_capture_mission_start.lua`, GUIDA §2b.
 
 ## 10. Memoria di Claude (opzionale ma utile)
 In `docs/memoria_claude/` ci sono le note che Claude aveva salvato sul progetto (stile di lavoro, regole, stato). Non sono né asset né dati personali
@@ -138,6 +148,23 @@ In `docs/memoria_claude/` ci sono le note che Claude aveva salvato sul progetto 
 M=$(ls -d ~/.claude/projects/*AC2Remake*/ | head -1)memory; mkdir -p "$M" && cp docs/memoria_claude/*.md "$M"/
 ```
 La cartella `~/.claude/projects/<percorso-con-trattini>/` esiste solo dopo la prima sessione in `~/GitHub/AC2Remake`. Anche senza, tutto ciò che serve sta in `CLAUDE.md` e `docs/`.
+
+## 11. C leggibile `out/codice_leggibile/` (rigenerabile, derivato dal codice di Namco: mai in git)
+```sh
+python3 -I pipeline/ghidra_pick.py            # C grezzo delle 11 funzioni della musica -> out/codice_leggibile/musica_fighters_honor_grezzo.c
+python3 -I pipeline/ac2_music_playlist.py     # playlist dello stadio 0x21 dai dati: attesa [13, 3, 30, 31, 22, 30, 31, 25, 26], 72,7 s in totale
+```
+Poi Claude **riscrive a mano** `out/codice_leggibile/musica_fighters_honor.c` dal testo grezzo, con nomi nostri e commenti, seguendo SCOPERTE **#38 e #39**
+(che descrivono a parole tutta la catena): sezioni = dati e modi (`MODE_ONCE/LOOP/NEXT/CYCLE`), playlist di Fighter's Honor, avvio musica
+(`FUN_80047470`), API musicale (`FUN_80068fdc`), cosa fa la voce quando finisce (`FUN_80069958`), azioni di missione (`FUN_8005e348`, caso 0xb),
+distruzione dell'unità (`FUN_800483d4`, campo `+0x96` dal byte `+0x11` del record T1), fine missione (`FUN_800388ec`). Verifica nel VM: con i PF degli 8
+bersagli a terra (slot 12–19) a zero, l'indice della playlist (`[0x800b7ef4]`) passa da 0 a 1 dopo ~1750 fotogrammi (`mipsvm --serve`, comando `S file`).
+
+## 12. Savestate dell'emulatore (in git, decisione dell'utente del 2026-11-15, repo privato)
+`savestati/slot0.zst`, `slot2.zst`, `slot3.zst` (4,7 MB ciascuno). Sul PC nuovo: `cp savestati/*.zst ~/GitHub/ZonistationOne/run/savestates/` e caricarli
+dall'emulatore. Contenuto: **slot0** = titolo nel ROOT MENU di debug (salvato dall'utente), **slot3** = Fighter's Honor appena avviata (salvato dall'utente
+dopo il comando di avvio); **slot2** = non verificato. ⚠️ Un savestate dipende dalla versione dell'emulatore (`ZonistationOne` `master` di oggi): se non
+si carica, usare il passo 9. Sono dati del gioco: il repo deve restare **privato**.
 
 ## Se qualcosa non torna
 - Numeri diversi dagli attesi → fermarsi e segnalarlo prima di proseguire (il disco potrebbe essere un'altra versione: serve la PAL `SCES-00699`).

@@ -49,12 +49,12 @@ dal disco entra in git.
 |---|---|
 | Disco `Ace Combat 2 (Europe).bin`, BIOS `SCPH-7502.BIN` | **copiare a mano** (`ZonistationOne/games/`, `ZonistationOne/roms/`) |
 | `out/` (estratti) | rigenerare, vedi "Ricostruire `out/`" |
-| **`out/fh_start.bin`** (2 MB) | copiare dall'altro PC **oppure** ricatturare con `pipeline/lua/ac2_capture_mission_start.lua` (GUIDA §2b, titolo → ROOT MENU → mandare lo script come comando) |
-| **`out/codice_leggibile/musica_fighters_honor.c`** | **scritto a mano**, derivato dal codice di Namco, **non rigenerabile e non versionabile**: copiare a mano (la scoperta è comunque descritta a parole in SCOPERTE #39) |
+| **`out/fh_start.bin`** (2 MB) | si rigenera da solo: `./tools/capture_mission_start.sh` (✅ ~41 s, automatico; RECUPERO_ASSET §9) |
+| `out/codice_leggibile/` | si rigenera: `pipeline/ghidra_pick.py` + riscrittura guidata da SCOPERTE #38/#39 (RECUPERO_ASSET §11); derivato dal codice di Namco, mai in git |
 | Progetti Ghidra (`out/ghidra`, `out/ghidra_ov1`) | si rifanno con GUIDA §4 (loader e overlay 0) e con il comando sotto (overlay 1); i nomi che l'utente ha dato a mano nella GUI **non** si ritrovano: esportare/copiare la cartella del progetto se servono |
 | `engines/godot/assets/` | `./tools/sync_godot_assets.sh` (ora copia anche le tracce 13, 22, 25, 26, 30, 31) |
+| Savestate emulatore | **in git** (`savestati/`, eccezione voluta dall'utente), RECUPERO_ASSET §12 |
 | Memoria di Claude (`~/.claude/projects/…/memory/`) | copia in `docs/memoria_claude/` (in git): ripristino in `RECUPERO_ASSET.md` §10 |
-| Savestate emulatore (`ZonistationOne/run/savestates/`) | locali; non servono |
 | Software (Godot 4.7.2, Ghidra 12.2 + JDK 21/25, binutils MIPS, Unity, Real-ESRGAN) | `docs/STRUMENTI.md`; Real-ESRGAN lo lancia l'utente (`bash tools/install_upscaler.sh`, il permesso blocca l'esecuzione automatica) |
 
 ## Ricostruire `out/`
