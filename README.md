@@ -7,16 +7,16 @@ unica che produce glTF, PNG, WAV e dati di missione, e due motori: **Godot 4** (
 
 Il repo è privato e contiene solo codice, script e documentazione: **nessun asset del gioco è versionato**.
 
-## Stato (2026-11-14)
+## Stato (2026-11-15)
 
 | Fase | Stato |
 |---|---|
 | 0. Fondamenta (pipeline, riferimenti, emulatore) | ✅ |
 | 1. Mappatura disco e archivio ACE2 | ✅ |
-| 2. Asset | ▶️ 24 aerei giocabili e il blocco di Fighter's Honor (49 texture, 13 unità) estratti con texture; mancano audio e import in Godot |
-| 3. Reverse della missione → `mission/mission.json` | ▶️ **Fighter's Honor si avvia dal titolo** (ricetta verificata); da fare: nemici, waypoint, trigger |
-| 4. Slice giocabile in Godot 4 | ▶️ avviata: progetto Godot con visualizzatore degli aerei (PS1 fedele / moderna); da fare: scena di volo, nemici, HUD |
-| 5. Confronto con Unity | ⬜ |
+| 2. Asset | ✅ 24 aerei, blocco di Fighter's Honor, terreno (104k poligoni), 64 tracce audio XA; ⚠️ banco sonoro originale non trovato (effetti segnaposto) |
+| 3. Reverse della missione | ▶️ **si avvia dal titolo**; tabelle T1–T9 decodificate; interprete MIPS in C eseguito sul codice originale (0 byte di differenza sulle unità); da fare: semantica manovre/rotte |
+| 4. Slice giocabile in Godot 4 | ▶️ demo di volo (HUD, camera cabina/esterna, musica, esplosioni) e vista dal vivo con il codice originale; da fare: comportamento originale dentro Godot (joypad/tempo, caricamento dal DAT), flusso titolo/briefing |
+| 5. Confronto con Unity | ⬜ opzionale |
 
 Dettaglio, problema aperto e prossimi passi: [docs/CONTESTO.md](docs/CONTESTO.md).
 
@@ -76,11 +76,11 @@ CLAUDE.md       contesto e regole per Claude Code su una macchina nuova
 | [docs/STRUMENTI.md](docs/STRUMENTI.md) | **tutti gli strumenti** usati e da scaricare: versione, fonte, comando di installazione, stato |
 | [docs/MULTI_PC.md](docs/MULTI_PC.md) | **lavorare su più PC**: cosa è in git, cosa no, come riprendere |
 | [docs/GUIDA.md](docs/GUIDA.md) | **come si usa tutto**: installazione, emulatore, estrazione, Ghidra (comandi verificati) |
-| [docs/SCOPERTE.md](docs/SCOPERTE.md) | registro delle scoperte sul disco e sul codice, con prove (#1–#14) |
+| [docs/SCOPERTE.md](docs/SCOPERTE.md) | registro delle scoperte sul disco e sul codice, con prove (#1–#33) |
 | [docs/PIPELINE.md](docs/PIPELINE.md) | strumenti e formati: CD, TIM, container DAT, modello 3D di AC2, XA, archivio |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | fasi con gate verificabili, rischi e rimedi |
 | [docs/METODOLOGIA_RE.md](docs/METODOLOGIA_RE.md) | come si reverse-ingegnerizza la missione (prima dinamico, poi statico) |
-| [docs/DECISIONI.md](docs/DECISIONI.md) | registro delle scelte e dei motivi (D1–D11) |
+| [docs/DECISIONI.md](docs/DECISIONI.md) | registro delle scelte e dei motivi (D1–D14) |
 
 ## Regole
 
